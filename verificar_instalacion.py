@@ -1,6 +1,6 @@
 """verificar_instalacion.py — Comprueba que la computadora está lista para el curso.
 
-Ejecutar desde la carpeta Curso_V3 con el entorno virtual activado:
+Ejecutar desde la carpeta Curso_Opt con el entorno virtual activado:
     python verificar_instalacion.py
 
 Revisa: versión de Python, paquetes (incluido otter, el calificador de las tareas),
