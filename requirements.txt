@@ -1,0 +1,18 @@
+# Curso «Optimización metaheurística orientada a modelación hidrogeológica»
+# UNAM – Instituto de Geología · Educación Continua · noviembre 2026
+# Dependencias de las 4 sesiones (probadas con Python 3.11 a 3.14; en 3.14 se omite pyamg, que es opcional).
+#   pip install -r requirements.txt
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.9         # 3.9 o más: los diagramas de caja usan tick_labels
+pillow>=9.0        # animaciones GIF de los notebooks
+plotly>=5.18       # frentes de Pareto en 3-D que se giran con el mouse (sesiones 3 y 4)
+pyamg>=5.0; python_version < "3.14"   # solver multimalla de rrwpt (opcional, acelera; aún no existe para 3.14)
+
+# El simulador del laboratorio, compilado (sin código fuente), desde la carpeta wheels/ de este curso.
+# pip elige solo el archivo de tu sistema (Windows, Mac o Linux) y tu versión de Python (3.11 a 3.14).
+--find-links ./wheels
+rrwpt==0.1.0
+jupyter
+ipykernel          # kernel que usa VS Code para ejecutar los notebooks
+otter-grader>=6.0  # pruebas automáticas de los cuadernos de tarea
