@@ -319,7 +319,7 @@ def mapa(resultado=None, titulo=None, ax=None, mostrar_humedal=True, niveles=Non
         ax.plot(hx, hy, "P", ms=12, mfc="#8fd18f", mec="k", zorder=5)
         ax.annotate("humedal", (hx, hy), xytext=(8, -14), textcoords="offset points", fontsize=8, color="#2d6a2d", fontweight="bold")
     ax.set_xlabel("x [m]"); ax.set_ylabel("y [m]"); ax.set_aspect("equal")
-    ax.set_title(titulo or ("El acuífero de Fritz Nowak" if resultado is None else
+    ax.set_title(titulo or ("El acuífero de Fritz Wasser" if resultado is None else
                             f"Abatimiento con bombeos {np.round(resultado.bombeos).astype(int).tolist()} m³/d"))
     if propio:
         plt.tight_layout()
