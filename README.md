@@ -27,10 +27,3 @@ la Sesión 3 el lunes 16 y la Sesión 4 el lunes 23. Cada lunes vuelve a descarg
 | `Session_N/Tarea_N_estudiante.ipynb` | la tarea de la sesión |
 | `Session_N/Información/` | el código que usan los cuadernos y material de apoyo |
 
-## Las tareas y el examen
-
-- Cada sesión tiene su cuaderno de tarea: escribe valores en los recuadros **INGRESA AQUÍ LOS DATOS SOLICITADOS**, ejecuta y revisa
-  con `grader.check`. Guárdalo como `Tarea_N_<tu nombre>.ipynb` y súbelo al formulario del curso antes de la sesión siguiente
-  (la Tarea 4, a más tardar el viernes 27 de noviembre).
-- Cada cuaderno vale 10 puntos (8 automáticos y 2 de respuestas escritas) y **se aprueba con 6**.
-- Con **2 de los 4 cuadernos aprobados**, el examen está aprobado. Con el 80 % de asistencia, obtienes la constancia.
