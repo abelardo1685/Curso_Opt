@@ -22,18 +22,8 @@ import sys
 
 import numpy as np
 
-# --- localizar rrwpt: el paquete compilado que instala requirements.txt (carpeta wheels/);
-#     solo en la máquina del instructor, si no está instalado, se usa la copia con código de Curso_V2
-#     (guardada en ../Información/Versiones_anteriores/Curso_V2) ---
-try:
-    import rrwpt  # noqa: F401
-except ImportError:  # pragma: no cover
-    _aqui = os.path.dirname(os.path.abspath(__file__))
-    for _cand in (os.path.join(_aqui, "..", "Información", "Versiones_anteriores", "Curso_V2"), os.path.join(_aqui, "..", "Curso_V2")):
-        if os.path.isdir(os.path.join(_cand, "rrwpt")):
-            sys.path.insert(0, os.path.abspath(_cand))
-            break
-    import rrwpt  # noqa: F401
+# rrwpt: el simulador del laboratorio, compilado; lo instala requirements.txt desde la carpeta wheels/
+import rrwpt  # noqa: F401
 
 from rrwpt import config as _config, fem as _fem, geostat as _geostat, pipeline as _pipeline
 

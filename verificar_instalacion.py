@@ -51,12 +51,19 @@ except ImportError:
 
 print("\n=== 3. Carpetas del curso ===")
 raiz = os.path.dirname(os.path.abspath(__file__))
-for nombre in ["Session_1", "Session_2", "Session_3", "Session_4", "hidra.py",
-               os.path.join("Session_2", "Información", "codigo", "pso.py"),
-               os.path.join("Session_3", "Información", "codigo", "pyOMOPSO"),
-               os.path.join("Session_4", "Información", "codigo", "pyOMOPSO")]:
+for nombre in ["Session_1", "hidra.py"]:
     reporta(os.path.exists(os.path.join(raiz, nombre)), nombre,
             f"no se encuentra «{nombre}» junto a este script — descomprime el ZIP completo")
+# el material se publica cada lunes, un día antes de su sesión: las sesiones que aún no salen no son error
+for n, codigo, lunes in [(2, os.path.join("Información", "codigo", "pso.py"), "lunes 9"),
+                         (3, os.path.join("Información", "codigo", "pyOMOPSO"), "lunes 16"),
+                         (4, os.path.join("Información", "codigo", "pyOMOPSO"), "lunes 23")]:
+    ses = f"Session_{n}"
+    if os.path.isdir(os.path.join(raiz, ses)):
+        reporta(os.path.exists(os.path.join(raiz, ses, codigo)), os.path.join(ses, codigo),
+                f"falta «{os.path.join(ses, codigo)}» — vuelve a descargar el material completo")
+    else:
+        print(f"  [--]   {ses} todavía no se publica: se sube el {lunes} de noviembre")
 
 print("\n=== 4. Simulador (acuífero del curso) ===")
 if errores == 0:
@@ -83,6 +90,6 @@ else:
 
 print()
 if errores == 0:
-    print("INSTALACIÓN CORRECTA — tu computadora está lista para las 4 sesiones.")
+    print("INSTALACIÓN CORRECTA — tu computadora está lista para el curso.")
 else:
     print(f"Hay {errores} punto(s) por corregir. Revisa la sección «Problemas frecuentes» de la guía.")

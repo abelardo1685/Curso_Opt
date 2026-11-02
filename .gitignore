@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .OTTER_LOG
 *Zone.Identifier
+_cache_hidra/
