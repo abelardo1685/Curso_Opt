@@ -20,10 +20,51 @@ completo con los tres pozos a la vez; no usa ninguna tabla precalculada.
 import os
 import sys
 
-import numpy as np
 
-# rrwpt: el simulador del laboratorio, compilado; lo instala requirements.txt desde la carpeta wheels/
-import rrwpt  # noqa: F401
+def _paquetes_del_venv(raiz):
+    """Carpetas site-packages del .venv del curso (junto a este archivo), si su versión de Python es la que corre ahora."""
+    cfg = os.path.join(raiz, ".venv", "pyvenv.cfg")
+    if not os.path.isfile(cfg):
+        return []
+    version = ""
+    with open(cfg, encoding="utf-8", errors="ignore") as f:
+        for linea in f:
+            clave, _, valor = linea.partition("=")
+            if clave.strip() in ("version", "version_info"):
+                version = valor.strip()
+    mayor_menor = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if ".".join(version.split(".")[:2]) != mayor_menor:
+        return []
+    candidatas = [os.path.join(raiz, ".venv", "Lib", "site-packages"),
+                  os.path.join(raiz, ".venv", "lib", f"python{mayor_menor}", "site-packages")]
+    return [c for c in candidatas if os.path.isdir(c)]
+
+
+# --- localizar rrwpt: el paquete compilado que instala requirements.txt (carpeta wheels/) en el .venv del curso.
+#     Si el cuaderno corre con otro Python (VS Code eligió un kernel que no es .venv), se usan los paquetes del .venv
+#     que está junto a este archivo, antes de importar numpy, para que todo salga del mismo entorno.
+try:
+    import rrwpt  # noqa: F401
+except ImportError:  # pragma: no cover
+    import site
+    _aqui = os.path.dirname(os.path.abspath(__file__))
+    _venv = _paquetes_del_venv(_aqui)
+    if _venv:
+        _antes = list(sys.path)
+        for _sp in _venv:
+            site.addsitedir(_sp)                       # también lee los .pth del entorno
+        sys.path[:] = [p for p in sys.path if p not in _antes] + _antes
+        print(f"Aviso: este cuaderno corre con {sys.executable}, no con el .venv del curso.\n"
+              "hidra usará los paquetes del .venv. Para quitar este aviso, elige el kernel .venv (arriba a la derecha).")
+    try:
+        import rrwpt  # noqa: F401
+    except ImportError:
+        raise ImportError(
+            f"No se encontró rrwpt. Este cuaderno corre con {sys.executable}.\n"
+            "Elige el kernel .venv del curso (arriba a la derecha del cuaderno, «Select Kernel» → «Python Environments» → .venv)\n"
+            "o vuelve a instalar la paquetería con la guía de instalación (sección 7).") from None
+
+import numpy as np
 
 from rrwpt import config as _config, fem as _fem, geostat as _geostat, pipeline as _pipeline
 
@@ -277,8 +318,9 @@ def campo_logK(geologia=None):
 
 
 # ============================================================== gráficas
-def mapa(resultado=None, titulo=None, ax=None, mostrar_humedal=True, niveles=None):
-    """Dibuja el acuífero. Sin argumentos: solo la geometría. Con un Resultado: el cono de abatimiento."""
+def mapa(resultado=None, titulo=None, ax=None, mostrar_humedal=True, niveles=None, vmax=None):
+    """Dibuja el acuífero. Sin argumentos: solo la geometría. Con un Resultado: el cono de abatimiento.
+    vmax fija el tope de la escala de color (para comparar varios mapas con la misma escala)."""
     import matplotlib.pyplot as plt
     propio = ax is None
     if propio:
@@ -286,7 +328,7 @@ def mapa(resultado=None, titulo=None, ax=None, mostrar_humedal=True, niveles=Non
     ext = [0, LADO, 0, LADO]
     if resultado is not None:
         im = ax.imshow(resultado.campo, origin="lower", extent=ext, cmap="Blues", vmin=0,
-                       vmax=max(0.5, float(np.ceil(resultado.abatimiento_maximo * 2) / 2)))
+                       vmax=vmax if vmax is not None else max(0.5, float(np.ceil(resultado.abatimiento_maximo * 2) / 2)))
         cs = ax.contour(np.linspace(0, LADO, resultado.campo.shape[1]), np.linspace(0, LADO, resultado.campo.shape[0]),
                         resultado.campo, levels=niveles or [0.25, 0.5, 1, 2, 3], colors="k", linewidths=0.6)
         ax.clabel(cs, fmt="%g m", fontsize=7)
