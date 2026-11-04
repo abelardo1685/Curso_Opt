@@ -23,6 +23,7 @@ la Sesión 3 el lunes 16 y la Sesión 4 el lunes 23. Cada lunes vuelve a descarg
 
 | Carpeta | Qué es |
 |---|---|
+| `Session_N/SN_*.pdf` | las láminas de la sesión (se suben después de cada clase) |
 | `Session_N/SN_*.ipynb` | el cuaderno que trabajamos en clase |
 | `Session_N/Tarea_N_estudiante.ipynb` | la tarea de la sesión |
 | `Session_N/Información/` | el código que usan los cuadernos y material de apoyo |
