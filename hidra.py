@@ -489,6 +489,234 @@ def caras_frente(*frentes, ejes=("f1", "f2", "f3"), titulo=None, punto=None, alt
     fig.tight_layout()
     return fig
 
+
+# ============================================================== gráficas del enjambre (sesión 2, versión 3 del cuaderno: 2026-11-05)
+# Cada función recibe lo que el algoritmo ya produjo (pop, gbest, pso.historial, la historia de posiciones) y dibuja; no calcula nada del PSO.
+def _malla_funcion(f, lim, n=200):
+    """Malla (X, Y, Z) de una función de prueba f(x) en el cuadro [lim[0], lim[1]]²."""
+    v = np.linspace(lim[0], lim[1], n); X, Y = np.meshgrid(v, v)
+    Z = np.array([[f(np.array([x, y])) for x in v] for y in v])
+    return X, Y, Z
+
+
+def superficie_prueba(f, lim=(-5, 5), gbest=None, nombre="Sphere", minimo=(0, 0)):
+    """La función de prueba en 3-D y desde arriba, con el mínimo global (estrella) y, si se da, el gbest del enjambre (cruz)."""
+    import matplotlib.pyplot as plt
+    X, Y, Z = _malla_funcion(f, lim, 150)
+    fig = plt.figure(figsize=(13, 5))
+    ax3 = fig.add_subplot(1, 2, 1, projection="3d")
+    ax3.plot_surface(X, Y, Z, cmap="turbo", edgecolor="none", alpha=0.95)
+    ax3.set_title(f"{nombre} en 2-D"); ax3.set_xlabel("$x_1$"); ax3.set_ylabel("$x_2$"); ax3.set_zlabel(f"{nombre}(x)")
+    ax = fig.add_subplot(1, 2, 2)
+    cf = ax.contourf(X, Y, Z, levels=40, cmap="turbo"); fig.colorbar(cf, ax=ax, label=f"{nombre}(x)")
+    ax.plot(minimo[0], minimo[1], "*", ms=18, mfc="yellow", mec="k", label=f"mínimo global {tuple(minimo)}")
+    if gbest is not None:
+        ax.plot(gbest["position"][0], gbest["position"][1], "wX", ms=12, mec="k", label=f"gbest del enjambre: costo {gbest['cost']:.1e}")
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("Vista desde arriba"); ax.legend(loc="upper right")
+    plt.tight_layout(); plt.show()
+
+
+def terreno_parametros(f, VarMin, VarMax, parametros, nombre="Sphere", minimo=(0, 0)):
+    """El dominio [VarMin, VarMax]² sobre la función de prueba y una ficha con los parámetros del enjambre (un diccionario nombre -> valor)."""
+    import matplotlib.pyplot as plt
+    X, Y, Z = _malla_funcion(f, (VarMin - 1, VarMax + 1), 200)
+    fig, ax = plt.subplots(figsize=(7.5, 5.2))
+    ax.contourf(X, Y, Z, levels=30, cmap="turbo", alpha=0.85)
+    ax.add_patch(plt.Rectangle((VarMin, VarMin), VarMax - VarMin, VarMax - VarMin, fill=False, ec="w", lw=2.5, ls="--"))
+    ax.plot(minimo[0], minimo[1], "*", ms=18, mfc="yellow", mec="k"); ax.text(minimo[0] + 0.25, minimo[1] + 0.25, f"mínimo de {nombre}: {tuple(minimo)}", color="w", fontsize=10)
+    ax.text(VarMin, VarMax + 0.2, f"dominio [{VarMin}, {VarMax}]²: VarMin y VarMax", color="w", fontsize=10)
+    ficha = "\n".join(f"{k} = {v}" for k, v in parametros.items())
+    ax.text(1.02, 0.97, ficha, transform=ax.transAxes, va="top", fontsize=11, family="monospace", bbox=dict(boxstyle="round", fc="#F2F5F9", ec="#B8D2DA"))
+    ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$"); ax.set_title("El terreno y los parámetros"); plt.tight_layout(); plt.show()
+
+
+def poblacion(pop, gbest, f, VarMin, VarMax, n_tabla=7, nombre="Sphere"):
+    """La «librería» de partículas: a la izquierda, las partículas numeradas sobre el terreno (gbest como estrella); a la derecha, la tabla de pop
+    (las primeras n_tabla y la que es gbest, marcada con ★)."""
+    import matplotlib.pyplot as plt
+    X, Y, Z = _malla_funcion(f, (VarMin, VarMax), 200)
+    P0 = np.array([p["position"] for p in pop]); n = len(pop)
+    fig, (ax, axt) = plt.subplots(1, 2, figsize=(14, 5.2), gridspec_kw={"width_ratios": [1, 1.3]})
+    ax.contourf(X, Y, Z, levels=30, cmap="turbo", alpha=0.85)
+    ax.plot(P0[:, 0], P0[:, 1], "wo", ms=8, mec="k", label="partículas")
+    for i, p in enumerate(pop):
+        ax.annotate(str(i), p["position"], xytext=(5, 4), textcoords="offset points", fontsize=8, color="w")
+    ax.plot(gbest["position"][0], gbest["position"][1], "*", ms=20, mfc="yellow", mec="k", label=f"gbest: costo {gbest['cost']:.3f}")
+    ax.set_xlim(VarMin, VarMax); ax.set_ylim(VarMin, VarMax); ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
+    ax.set_title(f"{n} partículas sobre {nombre}"); ax.legend(loc="upper right", fontsize=9)
+    axt.axis("off")
+    kg = int(np.argmin([p["best_cost"] for p in pop]))
+    vec = lambda v: "(" + ", ".join(f"{x:.2f}" for x in v) + ")"
+    fila = lambda i, p: [i, vec(p["position"]), vec(p["velocity"]), f"{p['cost']:.3f}", vec(p["best_position"]), f"{p['best_cost']:.3f}"]
+    filas = [fila(i, p) for i, p in enumerate(pop[:n_tabla])] + [["…"] * 6] + [fila(f"{kg} ★", pop[kg])]
+    tabla = axt.table(cellText=filas, colLabels=["i", "position", "velocity", "cost", "best_position", "best_cost"], loc="center", cellLoc="center")
+    tabla.auto_set_font_size(False); tabla.set_fontsize(9.5); tabla.scale(1, 1.5)
+    for (r, c), celda in tabla.get_celld().items():
+        if r == 0: celda.set_facecolor("#B8D2DA"); celda.set_text_props(weight="bold")
+        elif r == len(filas): celda.set_facecolor("#FBF1D6")
+    axt.set_title(f"pop: una lista de diccionarios, uno por partícula (las primeras {n_tabla} de {n} y la {kg}, que es gbest ★)")
+    plt.tight_layout(); plt.show()
+
+
+def instantes(H, historial, f, VarMin, VarMax, iteraciones=(0, 3, 10, -1), minimo=(0, 0)):
+    """Cuatro instantes del enjambre (H: historia de posiciones, forma (iteraciones + 1, partículas, 2)) y la curva del mejor costo."""
+    import matplotlib.pyplot as plt
+    X, Y, Z = _malla_funcion(f, (VarMin, VarMax), 200); H = np.asarray(H); historial = np.asarray(historial)
+    its = [len(H) - 1 if it < 0 else it for it in iteraciones]
+    fig, ejes = plt.subplots(1, len(its) + 1, figsize=(3.6 * len(its) + 4.5, 3.9), gridspec_kw={"width_ratios": [1] * len(its) + [1.35]})
+    for ax, it in zip(ejes[:-1], its):
+        ax.contourf(X, Y, Z, levels=30, cmap="turbo", alpha=0.85)
+        ax.plot(H[it][:, 0], H[it][:, 1], "wo", ms=6, mec="k"); ax.plot(minimo[0], minimo[1], "*", ms=14, mfc="yellow", mec="k")
+        ax.set_xlim(VarMin, VarMax); ax.set_ylim(VarMin, VarMax); ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"iteración {it} · mejor {historial[it]:.1e}", fontsize=10)
+    ejes[-1].semilogy(historial, lw=2, color="#0B5B72"); ejes[-1].set_xlabel("iteración"); ejes[-1].set_ylabel("mejor costo")
+    ejes[-1].set_title("curva de convergencia", fontsize=10); ejes[-1].grid(alpha=0.3); plt.tight_layout(); plt.show()
+
+
+def convergencia(historial, referencia=None, etiqueta="mejor costo del enjambre", etiqueta_ref="referencia", log=False,
+                 ylabel="mejor costo", titulo="Curva de convergencia", ylim_rel=None):
+    """La curva del mejor costo por iteración; con referencia, la línea del valor exacto (o de la malla). ylim_rel = (abajo, arriba) como fracción de la referencia."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(7.5, 4.3))
+    (ax.semilogy if log else ax.plot)(historial, lw=2, label=etiqueta)
+    if referencia is not None:
+        ax.axhline(referencia, color="g", ls="--", lw=1.5, label=f"{etiqueta_ref} ({referencia:.2f})")
+        if ylim_rel: ax.set_ylim(referencia * ylim_rel[0], referencia * ylim_rel[1])
+    ax.set_xlabel("Iteración"); ax.set_ylabel(ylabel); ax.set_title(titulo); ax.legend(); plt.tight_layout(); plt.show()
+
+
+def resultado_enjambre(historial, pop, gbest, f, VarMin, VarMax, nombre="Sphere"):
+    """Lo que devuelve PSO, en dos paneles: la curva de convergencia (log) y las partículas al final sobre la función, con gbest."""
+    import matplotlib.pyplot as plt
+    X, Y, Z = _malla_funcion(f, (VarMin, VarMax), 150)
+    fig, ejes = plt.subplots(1, 2, figsize=(12, 4.5))
+    ejes[0].semilogy(historial, lw=2); ejes[0].set_xlabel("Iteración"); ejes[0].set_ylabel("Mejor costo (escala log)"); ejes[0].set_title(f"Curva de convergencia en {nombre}")
+    cf = ejes[1].contourf(X, Y, Z, levels=30, cmap="turbo"); fig.colorbar(cf, ax=ejes[1], label=f"{nombre}(x)")
+    finales = np.array([p["position"] for p in pop])
+    ejes[1].plot(finales[:, 0], finales[:, 1], "wo", ms=4, mec="k", label="partículas al final")
+    ejes[1].plot(gbest["position"][0], gbest["position"][1], "*", ms=18, mfc="yellow", mec="k", label="mejor global")
+    ejes[1].set_xlabel("$x_1$"); ejes[1].set_ylabel("$x_2$"); ejes[1].legend(loc="upper right"); ejes[1].set_title("Dónde terminaron las partículas")
+    plt.tight_layout(); plt.show()
+
+
+def estadistica_corridas(resultados, etiqueta="Ackley 10-D\n10 semillas", umbral=0.1, optimo=0.0):
+    """Diagrama de caja de los mejores costos de varias corridas (semillas), con la línea del óptimo global."""
+    import matplotlib.pyplot as plt
+    resultados = np.asarray(resultados)
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.boxplot(resultados, tick_labels=[etiqueta])
+    ax.scatter(np.ones_like(resultados), resultados, alpha=0.6, zorder=3)
+    ax.axhline(optimo, color="g", ls="--", lw=1, label=f"óptimo global (f = {optimo:g})")
+    ax.set_ylabel("Mejor costo encontrado"); ax.set_title("Reporta la estadística, no una corrida"); ax.legend(); plt.tight_layout(); plt.show()
+
+
+def convergencias(historiales, titulo="Curvas de convergencia", ylabel="Mejor costo", log=False):
+    """Varias curvas en un eje: historiales = {etiqueta: lista del mejor costo por iteración}."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for nombre, h in historiales.items():
+        (ax.semilogy if log else ax.plot)(h, lw=2, label=nombre)
+    ax.set_xlabel("Iteración"); ax.set_ylabel(ylabel)
+    if not log: ax.set_ylim(bottom=0)
+    ax.set_title(titulo); ax.legend(); plt.tight_layout(); plt.show()
+
+
+def paisajes_castigo(alpha, alpha_h, p3, s_max, s_hum, p_exacto, Ms=(50, 10_000), p_max=1000):
+    """Tres paisajes de la calificación de Fritz en el plano (p1, p2) con p3 fijo: el cambio de signo del original y el castigo graduado con cada M.
+    La línea blanca es la región factible; la cruz, la mejor calificación de cada paisaje; la estrella, el óptimo exacto."""
+    import matplotlib.pyplot as plt
+    r = np.linspace(0, p_max, 201); P1, P2 = np.meshgrid(r, r)
+    S = alpha[:, 0, None, None] * P1 + alpha[:, 1, None, None] * P2 + alpha[:, 2, None, None] * p3
+    SH = alpha_h[0] * P1 + alpha_h[1] * P2 + alpha_h[2] * p3
+    exceso = np.maximum(S - s_max, 0).sum(axis=0) + np.maximum(SH - s_hum, 0); total = P1 + P2 + p3
+    paisajes = [("el original: cambio de signo", np.where(exceso > 0, -total, total))] + [(f"graduado con M = {M:,}".replace(",", " "), total - M * exceso) for M in Ms]
+    fig, ejes = plt.subplots(1, len(paisajes), figsize=(6 * len(paisajes), 5))
+    for ax, (titulo, calif) in zip(ejes, paisajes):
+        im = ax.contourf(P1, P2, calif, levels=np.linspace(-1500, 2300, 30), cmap="viridis", extend="both")
+        ax.contour(P1, P2, exceso, levels=[1e-9], colors="w", linewidths=2)
+        k = np.unravel_index(np.argmax(calif), calif.shape)
+        ax.plot(P1[k], P2[k], "rX", ms=14, mec="w", label=f"mejor calificación ({P1[k]:.0f}, {P2[k]:.0f})")
+        ax.plot(p_exacto[0], p_exacto[1], "*", ms=18, mfc="yellow", mec="k", label="óptimo exacto")
+        ax.set_title(titulo); ax.set_xlabel("$p_1$ [m³/d]"); ax.set_ylabel("$p_2$ [m³/d]"); ax.legend(loc="upper right", fontsize=9)
+    fig.colorbar(im, ax=ejes, label="calificación", shrink=0.8); plt.show()
+
+
+def curva_beneficio(precio, alpha, c_qp, gslev, h0, pozo=0, p_max=500):
+    """Un solo pozo bombeando de 0 a p_max: ingreso (recta), costo (crece con el abatimiento) y beneficio con su máximo."""
+    import matplotlib.pyplot as plt
+    q = np.linspace(0, p_max, 201); X = np.zeros((len(q), 3)); X[:, pozo] = q
+    ingreso = precio * q; costo = np.array([np.sum(c_qp * x * (gslev - h0 + alpha @ x)) for x in X]); benef = ingreso - costo; k = int(np.argmax(benef))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(q, ingreso, lw=2, color="#1F7A55", label="ingreso: precio × bombeo (recta)")
+    ax.plot(q, costo, lw=2, color="#B03A2E", label="costo de bombeo (crece con el abatimiento)")
+    ax.plot(q, benef, lw=3, color="#0B5B72", label="beneficio = ingreso − costo")
+    ax.plot(q[k], benef[k], "o", ms=10, mfc="yellow", mec="k", label=f"máximo: {q[k]:.0f} m³/d, {benef[k]:.2f} $/d")
+    ax.axhline(0, color="k", lw=0.8); ax.set_xlabel(f"bombeo del pozo {pozo + 1} [m³/d] (los otros apagados)"); ax.set_ylabel("$/d")
+    ax.set_title("Por qué el óptimo deja la esquina: el beneficio tiene su máximo adentro"); ax.legend(fontsize=9); ax.grid(alpha=0.3); plt.tight_layout(); plt.show()
+
+
+def paisaje_beneficio(alpha, alpha_h, precio, c_qp, gslev, h0, s_max, s_hum, x_ref, p_max=500):
+    """El beneficio en el plano (p1, p2) con el pozo 3 apagado, la región factible (línea blanca) y el mejor punto de la malla (estrella)."""
+    import matplotlib.pyplot as plt
+    r = np.linspace(0, p_max, 201); P1, P2 = np.meshgrid(r, r)
+    XX = np.stack([P1.ravel(), P2.ravel(), np.zeros(P1.size)], axis=1); SS = XX @ alpha.T
+    BB = (precio * XX.sum(1) - (c_qp * XX * (gslev - h0 + SS)).sum(1)).reshape(P1.shape)
+    ok = ((SS <= s_max).all(axis=1) & (XX @ alpha_h <= s_hum)).reshape(P1.shape)
+    fig, ax = plt.subplots(figsize=(7.5, 6))
+    im = ax.contourf(P1, P2, BB, levels=30, cmap="viridis"); fig.colorbar(im, ax=ax, label="beneficio [$/d]")
+    ax.contour(P1, P2, ok.astype(float), levels=[0.5], colors="w", linewidths=2)
+    ax.plot(x_ref[0], x_ref[1], "*", ms=20, mfc="yellow", mec="k", label=f"mejor de la malla ({x_ref[0]:.0f}, {x_ref[1]:.0f})")
+    ax.set_xlabel("$p_1$ [m³/d]"); ax.set_ylabel("$p_2$ [m³/d]"); ax.legend(loc="upper right")
+    ax.set_title("El beneficio (pozo 3 apagado): la cima está DENTRO de la región factible"); plt.tight_layout(); plt.show()
+
+
+def optimo_contra_precio(precios, total_lineal, total_no_lineal, precio_actual=None):
+    """El bombeo total óptimo contra el precio del agua: el lineal salta de esquina en esquina; el no lineal crece suave."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 4.6))
+    ax.step(precios, total_lineal, where="mid", lw=2.5, color="#B03A2E", label="costo lineal (linprog): salta de esquina en esquina")
+    ax.plot(precios, total_no_lineal, "o-", lw=2.5, color="#003D79", label="costo con abatimiento (no lineal): crece suave")
+    if precio_actual is not None: ax.axvline(precio_actual, color="#C08A0B", ls=":", label=f"precio de la sección 3 ({precio_actual})")
+    ax.set_xlabel("precio del agua [$/m³]"); ax.set_ylabel("bombeo total óptimo [m³/d]"); ax.legend(fontsize=9)
+    ax.set_title("Lineal contra no lineal: cómo responde el óptimo al precio"); plt.tight_layout(); plt.show()
+
+
+def mapas_geologias(geologias=(None, 1, 3), vmin=-8.5, vmax=-4.5):
+    """Los mapas de log K de varias geologías, lado a lado y con la misma escala."""
+    import matplotlib.pyplot as plt
+    fig, ejes = plt.subplots(1, len(geologias), figsize=(5.4 * len(geologias), 4.4))
+    for ax, geo in zip(np.atleast_1d(ejes), geologias):
+        mapa_geologia(geo, ax=ax, vmin=vmin, vmax=vmax)
+    plt.tight_layout(); plt.show()
+
+
+def animar_enjambre(historia, ruta_gif, f=None, lim=(-5, 5), region=None, titulo="El enjambre", fps=8, minimo=(0, 0)):
+    """Guarda un GIF con el enjambre iteración por iteración y lo devuelve para mostrarlo en el cuaderno.
+    historia: lista o arreglo (iteraciones + 1, partículas, 2). Fondo: una función de prueba (f, lim) o una región factible
+    (region = dict(A=..., b=..., nombres=[...], p_optimo=...))."""
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
+    from IPython.display import Image
+    os.makedirs(os.path.dirname(ruta_gif) or ".", exist_ok=True)
+    historia = np.asarray(historia); n = len(historia) - 1
+    if region is not None:
+        ax = graficar_region_factible(region["A"], region["b"], region["nombres"], p_optimo=region.get("p_optimo"), titulo=titulo); fig = ax.figure
+        puntos, = ax.plot([], [], "o", ms=6, mfc="w", mec="k", zorder=6)
+    else:
+        X, Y, Z = _malla_funcion(f, lim, 200)
+        fig, ax = plt.subplots(figsize=(6.5, 5.5))
+        ax.contourf(X, Y, Z, levels=30, cmap="turbo", alpha=0.85)
+        puntos, = ax.plot([], [], "wo", ms=6, mec="k"); ax.plot(minimo[0], minimo[1], "*", ms=18, mfc="yellow", mec="k")
+        ax.set_xlabel("$x_1$"); ax.set_ylabel("$x_2$")
+
+    def cuadro(k):
+        puntos.set_data(historia[k][:, 0], historia[k][:, 1]); ax.set_title(f"{titulo} · iteración {k} de {n}")
+        return puntos,
+    anim = FuncAnimation(fig, cuadro, frames=len(historia), interval=1000 // fps)
+    anim.save(ruta_gif, writer=PillowWriter(fps=fps), dpi=80); plt.close(fig)
+    return Image(ruta_gif)
+
+
 def datos_tarea(identificador):
     """Los datos personales de la tarea, derivados de un identificador del estudiante (siempre los mismos para el mismo texto).
 

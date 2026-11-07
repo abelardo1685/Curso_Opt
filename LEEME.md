@@ -17,14 +17,16 @@ la Sesión 3 el lunes 16 y la Sesión 4 el lunes 23. Cada lunes vuelve a descarg
 1. Sigue la guía `Guia_Instalacion_VSCode_Python_Windows.pdf`: instala Python y VS Code, crea el entorno `.venv` en esta carpeta e
    instala los paquetes con `pip install -r requirements.txt`.
 2. Comprueba la instalación: `python verificar_instalacion.py` debe terminar con «INSTALACIÓN CORRECTA».
-3. Abre esta carpeta completa (`Curso_Opt`) en VS Code. No muevas ni renombres las subcarpetas: los cuadernos buscan `hidra.py` aquí arriba.
+3. Abre esta carpeta completa (`Curso_Opt`) en VS Code. No muevas ni renombres las subcarpetas: cada cuaderno usa el `hidra.py` de su propia
+   carpeta `Session_N` (la versión que se usó en esa sesión); el de aquí arriba es el más reciente y lo usan la guía y el comprobador.
 
 ## Qué hay en cada sesión
 
 | Carpeta | Qué es |
 |---|---|
-| `Session_N/SN_*.pdf` | las láminas de la sesión (se suben después de cada clase) |
+| `Session_N/SN_*.pdf` o `.pptx` | las láminas de la sesión (la S1 en PDF; la S2 en PowerPoint, con sus videos) |
 | `Session_N/SN_*.ipynb` | el cuaderno que trabajamos en clase |
+| `Session_N/hidra.py` | el acuífero del curso, en la versión de esa sesión (la de la S2 trae las funciones de gráficas del enjambre) |
 | `Session_N/Tarea_N_estudiante.ipynb` | la tarea de la sesión |
 | `Session_N/Información/` | el código que usan los cuadernos y material de apoyo |
 
