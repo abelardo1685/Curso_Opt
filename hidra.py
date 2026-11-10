@@ -65,6 +65,10 @@ except ImportError:  # pragma: no cover
             "o vuelve a instalar la paquetería con la guía de instalación (sección 7).") from None
 
 import numpy as np
+import warnings
+# 2026-11-09: kaleido (exportar figuras a imagen; el curso no lo usa) avisa al importarse si no coincide con la versión de plotly.
+# En el entorno del curso no está instalado; en otros Python el aviso solo confunde: se silencia.
+warnings.filterwarnings("ignore", message=r"(?s).*Kaleido", category=UserWarning)
 
 from rrwpt import config as _config, fem as _fem, geostat as _geostat, pipeline as _pipeline
 
@@ -499,6 +503,29 @@ def _malla_funcion(f, lim, n=200):
     return X, Y, Z
 
 
+def superficie_3d(f, lim=(-5, 5), nombre="Sphere", minimo=(0, 0), n=80, alto=560):
+    """La función de prueba en 3-D, interactiva (plotly): se gira, se acerca y se mueve con el mouse. Marca el mínimo global con una estrella.
+    Sirve para ver la forma completa antes de optimizar: Sphere es un solo valle (convexa); Ackley, un embudo lleno de hoyos."""
+    try:
+        import plotly.graph_objects as go
+        import plotly.io as pio
+    except ImportError as e:
+        raise ImportError("Falta plotly (la figura 3-D interactiva):  pip install -r requirements.txt") from e
+    # el mismo renderer que frente_3d: el que dibujan VS Code y JupyterLab, también al reabrir el cuaderno
+    if "google.colab" not in sys.modules:
+        pio.renderers.default = "plotly_mimetype"
+    X, Y, Z = _malla_funcion(f, lim, n)
+    z_min = float(f(np.array(minimo, dtype=float)))
+    fig = go.Figure(go.Surface(x=X, y=Y, z=Z, colorscale="Turbo", colorbar=dict(title=f"{nombre}(x)"), opacity=0.95,
+                               contours=dict(z=dict(show=True, usecolormap=True, project_z=True))))
+    fig.add_trace(go.Scatter3d(x=[minimo[0]], y=[minimo[1]], z=[z_min], mode="markers+text", text=[f"mínimo global {tuple(minimo)}"],
+                               textposition="top center", marker=dict(size=7, color="gold", symbol="diamond", line=dict(color="black", width=2)),
+                               showlegend=False))
+    fig.update_layout(title=f"{nombre} en 3-D · gírala con el mouse", height=alto, margin=dict(l=0, r=0, t=40, b=0),
+                      scene=dict(xaxis_title="x₁", yaxis_title="x₂", zaxis_title=f"{nombre}(x)", camera=dict(eye=dict(x=1.6, y=-1.6, z=1.0))))
+    fig.show()
+
+
 def superficie_prueba(f, lim=(-5, 5), gbest=None, nombre="Sphere", minimo=(0, 0)):
     """La función de prueba en 3-D y desde arriba, con el mínimo global (estrella) y, si se da, el gbest del enjambre (cruz)."""
     import matplotlib.pyplot as plt
@@ -688,6 +715,79 @@ def mapas_geologias(geologias=(None, 1, 3), vmin=-8.5, vmax=-4.5):
     for ax, geo in zip(np.atleast_1d(ejes), geologias):
         mapa_geologia(geo, ax=ax, vmin=vmin, vmax=vmax)
     plt.tight_layout(); plt.show()
+
+
+def registrar_pso(problem, MaxIter=100, PopSize=100, c1=1.5, c2=2.0, w=1.0, wdamp=0.995):
+    """La misma corrida que pso.PSO (el mismo ciclo y el mismo orden de números al azar: con la misma semilla da el mismo resultado), pero
+    guardando dónde está cada partícula en cada iteración, para animarla. Devuelve (H, H_costo, H_g): posiciones (MaxIter + 1, PopSize, nVar),
+    el mejor costo y la mejor posición del grupo en cada iteración. Fijar la semilla antes (np.random.seed) igual que con pso.PSO."""
+    f, lo, hi, n = problem["CostFunction"], problem["VarMin"], problem["VarMax"], problem["nVar"]
+    rep = problem.get("ResFunction"); minimiza = problem.get("MinProblem", 1) == 1
+    mejor = (lambda a, b: a < b) if minimiza else (lambda a, b: a > b)
+    pos = np.zeros((PopSize, n)); vel = np.zeros((PopSize, n)); pb = np.zeros((PopSize, n)); pbc = np.zeros(PopSize)
+    g, gc = None, (np.inf if minimiza else -np.inf)
+    for i in range(PopSize):
+        pos[i] = np.random.uniform(lo, hi, n)
+        if rep is not None: pos[i] = rep(pos[i])
+        c = f(pos[i]); pb[i] = pos[i].copy(); pbc[i] = c
+        if mejor(c, gc): g, gc = pos[i].copy(), c
+    H, Hc, Hg = [pos.copy()], [gc], [g.copy()]
+    for _ in range(MaxIter):
+        for i in range(PopSize):
+            vel[i] = w * vel[i] + c1 * np.random.rand(n) * (pb[i] - pos[i]) + c2 * np.random.rand(n) * (g - pos[i])
+            pos[i] = np.minimum(np.maximum(pos[i] + vel[i], lo), hi)
+            if rep is not None: pos[i] = rep(pos[i])
+            c = f(pos[i])
+            if mejor(c, pbc[i]):
+                pb[i], pbc[i] = pos[i].copy(), c
+                if mejor(c, gc): g, gc = pos[i].copy(), c
+        w *= wdamp; H.append(pos.copy()); Hc.append(gc); Hg.append(g.copy())
+    return np.array(H), np.array(Hc), np.array(Hg)
+
+
+def animar_enjambre_interactivo(H, H_costo, H_g, f, lim=(-5, 5), nombre="Sphere", minimo=(0, 0), alto=560):
+    """El enjambre en movimiento, en dos vistas lado a lado: desde arriba (curvas de nivel) y en 3-D sobre la superficie (que se puede girar
+    mientras corre). Botón ▶ y barra para ir a cualquier iteración (plotly). H, H_costo, H_g: lo que devuelve registrar_pso."""
+    try:
+        import plotly.graph_objects as go
+        import plotly.io as pio
+        from plotly.subplots import make_subplots
+    except ImportError as e:
+        raise ImportError("Falta plotly (la figura interactiva):  pip install -r requirements.txt") from e
+    if "google.colab" not in sys.modules:
+        pio.renderers.default = "plotly_mimetype"
+    X, Y, Z = _malla_funcion(f, lim, 60)
+    zf = lambda P: np.array([f(p) for p in P])
+    n = len(H) - 1; zmin = float(f(np.array(minimo, dtype=float)))
+    fig = make_subplots(rows=1, cols=2, specs=[[{"type": "xy"}, {"type": "scene"}]], column_widths=[0.45, 0.55],
+                        subplot_titles=("desde arriba", "en 3-D (gírala con el mouse)"))
+    fig.add_trace(go.Contour(x=X[0], y=Y[:, 0], z=Z, colorscale="Turbo", showscale=False, ncontours=25, opacity=0.85), 1, 1)
+    fig.add_trace(go.Scatter(x=H[0][:, 0], y=H[0][:, 1], mode="markers", marker=dict(size=7, color="white", line=dict(color="black", width=1)),
+                             name="partículas"), 1, 1)
+    fig.add_trace(go.Scatter(x=[H_g[0][0]], y=[H_g[0][1]], mode="markers", marker=dict(size=13, color="gold", symbol="diamond",
+                             line=dict(color="black", width=1.5)), name="mejor del grupo (g)"), 1, 1)
+    fig.add_trace(go.Surface(x=X, y=Y, z=Z, colorscale="Turbo", showscale=False, opacity=0.7), 1, 2)
+    fig.add_trace(go.Scatter3d(x=H[0][:, 0], y=H[0][:, 1], z=zf(H[0]), mode="markers", marker=dict(size=4, color="white",
+                               line=dict(color="black", width=1)), showlegend=False), 1, 2)
+    fig.add_trace(go.Scatter3d(x=[H_g[0][0]], y=[H_g[0][1]], z=[float(f(H_g[0]))], mode="markers", marker=dict(size=7, color="gold",
+                               symbol="diamond"), showlegend=False), 1, 2)
+    titulo = lambda k: f"{nombre}: el enjambre en la iteración {k} de {n} · mejor costo {H_costo[k]:.2e}"
+    fig.frames = [go.Frame(name=str(k), traces=[1, 2, 4, 5], layout=dict(title_text=titulo(k)),
+                           data=[go.Scatter(x=H[k][:, 0], y=H[k][:, 1]), go.Scatter(x=[H_g[k][0]], y=[H_g[k][1]]),
+                                 go.Scatter3d(x=H[k][:, 0], y=H[k][:, 1], z=zf(H[k])),
+                                 go.Scatter3d(x=[H_g[k][0]], y=[H_g[k][1]], z=[float(f(H_g[k]))])]) for k in range(n + 1)]
+    paso = dict(frame=dict(duration=250, redraw=True), transition=dict(duration=0), fromcurrent=True, mode="immediate")
+    fig.update_layout(title_text=titulo(0), height=alto, margin=dict(l=10, r=10, t=70, b=10),
+                      xaxis=dict(range=list(lim), title="x₁", scaleanchor="y"), yaxis=dict(range=list(lim), title="x₂"),
+                      scene=dict(xaxis_title="x₁", yaxis_title="x₂", zaxis_title=f"{nombre}(x)", camera=dict(eye=dict(x=1.6, y=-1.6, z=1.0))),
+                      legend=dict(orientation="h", y=-0.08, x=0.0),
+                      updatemenus=[dict(type="buttons", direction="left", x=0.0, y=1.13, showactive=False,
+                                        buttons=[dict(label="▶ correr", method="animate", args=[None, paso]),
+                                                 dict(label="❚❚ pausa", method="animate", args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")])])],
+                      sliders=[dict(active=0, y=0, x=0.1, len=0.9, currentvalue=dict(prefix="iteración "),
+                                    steps=[dict(label=str(k), method="animate", args=[[str(k)], dict(frame=dict(duration=0, redraw=True), mode="immediate")])
+                                           for k in range(n + 1)])])
+    fig.show()
 
 
 def animar_enjambre(historia, ruta_gif, f=None, lim=(-5, 5), region=None, titulo="El enjambre", fps=8, minimo=(0, 0)):
