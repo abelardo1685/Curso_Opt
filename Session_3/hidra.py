@@ -897,6 +897,27 @@ def mapa_indice(c_base, a_idx, k, p3=100, p_max=500):
     plt.title(f"El índice en función de los bombeos (pozo 3 fijo en {p3} m³/d)"); plt.tight_layout(); plt.show()
 
 
+def frente_referencia(evaluar, paso=10, p_max=500, s_max=3.0, s_hum=1.25, **kw):
+    """El frente de referencia por fuerza bruta (sesión 3, sección 2.3; 2026-11-16, ARP: «que esté en hidra y el cuaderno declare lo mínimo»).
+    Prueba TODAS las decisiones de una malla (cada `paso` m³/d por pozo, de 0 a `p_max`) con la función `evaluar(p)` del cuaderno, que devuelve
+    un diccionario con 's' (abatimientos en los pozos), 'humedal', 'costo' e 'indice'; los `kw` se le pasan tal cual (por ejemplo la matriz de
+    otra geología). Devuelve (X_leg, F_leg, X_ref, F_ref): las decisiones legales con sus objetivos (costo, índice) y, de ellas, las no dominadas."""
+    g = np.arange(0, p_max + 1, paso)
+    X = np.array(np.meshgrid(g, g, g, indexing="ij")).reshape(3, -1).T
+    S = np.empty((len(X), 3)); H = np.empty(len(X)); F = np.empty((len(X), 2))
+    for i, p in enumerate(X):
+        e = evaluar(p, **kw)
+        S[i], H[i], F[i] = e["s"], e["humedal"], (e["costo"], e["indice"])
+    legal = (S <= s_max + 1e-12).all(axis=1) & (H <= s_hum + 1e-12)
+    X_leg, F_leg = X[legal], F[legal]
+    orden = np.lexsort((F_leg[:, 1], F_leg[:, 0]))          # de la más barata a la más cara (y por índice en los empates)
+    k, mejor = [], np.inf
+    for i in orden:
+        if F_leg[i, 1] < mejor:                             # no dominada: menos índice que todas las más baratas
+            k.append(i); mejor = F_leg[i, 1]
+    return X_leg, F_leg, X_leg[k], F_leg[k]
+
+
 def espacios(X_leg, F_leg, X_ref, F_ref, n_muestra=4000, xl="costo [$/d]  (menos es mejor)", yl="índice de necesidad no cubierta  (menos es mejor)"):
     """Los dos espacios lado a lado: las decisiones legales (gris) y las no dominadas (oro) en decisión (3-D) y en objetivos (2-D)."""
     import matplotlib.pyplot as plt
@@ -913,9 +934,141 @@ def espacios(X_leg, F_leg, X_ref, F_ref, n_muestra=4000, xl="costo [$/d]  (menos
     plt.tight_layout(); plt.show()
 
 
-def frente_contra_referencia(F_ref, X_ref, F, X, xl="costo [$/d]", yl="índice de necesidad no cubierta"):
-    """OMOPSO (oro) contra la referencia de la malla (azul) en el espacio de objetivos y en el de decisión."""
+_REFERENCIA_3 = {}                                            # memoria de la superficie de referencia: se calcula una sola vez por `evaluar`
+
+
+def _referencia_3(ref):
+    """La superficie de referencia de tres objetivos. `ref` puede ser la tabla ya calculada o la función `evaluar` del cuaderno; en ese caso
+    se calcula por dentro (una sola vez: queda en memoria) con la malla cada 20 m³/d."""
+    return superficie_referencia(ref, imprimir=False)[0] if callable(ref) else ref
+
+
+def superficie_referencia(evaluar, paso=20, p_max=500, s_max=3.0, s_hum=1.25, imprimir=True):
+    """La superficie de referencia de tres objetivos (sesión 3, sección 3.2), por fuerza bruta: prueba todas las decisiones de una malla (cada `paso`
+    m³/d por pozo) con `evaluar`, se queda con las legales y, de ellas, con las no dominadas en (abatimiento total, costo, índice). Imprime cuántas
+    hay y las correlaciones entre los objetivos sobre el frente. Devuelve (F_ref, X_ref). 2026-11-16, ARP: la celda solo lleva el método."""
+    clave = (paso, p_max, s_max, s_hum)
+    if _REFERENCIA_3.get(clave, (None,))[0] is evaluar and not imprimir:
+        return _REFERENCIA_3[clave][1:]
+    g = np.arange(0, p_max + 1, float(paso))
+    X = np.array(np.meshgrid(g, g, g, indexing="ij")).reshape(3, -1).T
+    ev = [evaluar(p) for p in X]
+    legal = np.array([(e["s"] <= s_max).all() and e["humedal"] <= s_hum for e in ev])
+    X = X[legal]
+    F = np.array([(e["s"].sum(), e["costo"], e["indice"]) for e, ok in zip(ev, legal) if ok])
+    nd = np.ones(len(F), bool)
+    for i in range(len(F)):                                 # no dominada: ninguna otra es igual o mejor en todo y mejor en algo
+        if nd[i] and ((F <= F[i]).all(axis=1) & (F < F[i]).any(axis=1)).any():
+            nd[i] = False
+    F_ref, X_ref = F[nd], X[nd]
+    _REFERENCIA_3[clave] = (evaluar, F_ref, X_ref)
+    if imprimir:
+        r = np.corrcoef(F_ref.T)
+        print(f"{len(F)} decisiones legales; {len(F_ref)} no dominadas: la superficie de referencia")
+        print(f"correlaciones sobre el frente: abatimiento-costo {r[0, 1]:.2f} | abatimiento-índice {r[0, 2]:.2f} | costo-índice {r[1, 2]:.2f}")
+    return F_ref, X_ref
+
+
+def dominancia_por_objetivos(evaluar, paso=20, p_max=500, s_max=3.0, s_hum=1.25):
+    """Cuántas decisiones legales de la malla (cada `paso` m³/d) quedan sin dominar según cuántos objetivos se cuenten: dos (costo, índice),
+    tres (más el abatimiento total) y cuatro (más el abatimiento del humedal). Enseña que cada objetivo que se añade debilita la dominancia:
+    más decisiones «empatan» y el frente crece (sesión 3, «¿Y un cuarto objetivo?»)."""
+    g = np.arange(0, p_max + 1, float(paso))
+    X = np.array(np.meshgrid(g, g, g, indexing="ij")).reshape(3, -1).T
+    ev = [evaluar(p) for p in X]
+    F = np.array([(e["costo"], e["indice"], e["s"].sum(), e["humedal"]) for e in ev if (e["s"] <= s_max).all() and e["humedal"] <= s_hum])
+    print(f"de {len(F)} decisiones legales de la malla, quedan sin dominar:")
+    for n, nombre in ((2, "con 2 objetivos (costo, índice)"), (3, "con 3 objetivos (+ abatimiento total)"), (4, "con 4 objetivos (+ abatimiento del humedal)")):
+        Fk = F[:, :n]
+        nd = sum(not ((Fk <= Fk[i]).all(axis=1) & (Fk < Fk[i]).any(axis=1)).any() for i in range(len(Fk)))
+        print(f"  {nombre:44s} {nd:5d}   ({100 * nd / len(Fk):.1f} %)")
+
+
+def calidad_frente(F_ref, F):
+    """Imprime cuántas soluciones tiene el frente F y su distancia media al frente de referencia (en % del tamaño de la referencia).
+    Con tres objetivos, F_ref puede ser la función `evaluar` del cuaderno: la referencia (las no dominadas de una malla) se calcula por dentro."""
+    F_ref = _referencia_3(F_ref)
+    print(f"{len(F)} soluciones; distancia media al frente de referencia: {distancia_a_referencia(F_ref, F) * 100:.2f} % del tamaño del frente")
+
+
+def _normalizar_tres(F, F_ref):
+    """Normaliza el frente y la referencia con la escala del frente: 0 = lo mejor del frente, 1 = lo peor."""
+    lo, hi = F.min(0), F.max(0)
+    return (F - lo) / (hi - lo), (F_ref - lo) / (hi - lo)
+
+
+def frente_tres_objetivos(F, F_ref, k, ejes=("Abatimiento", "Costo", "Índice")):
+    """Sesión 3, sección 3.4.2: el frente de OMOPSO (blanco) sobre la referencia (gris), normalizados, con la solución k en rojo:
+    cuatro ángulos fijos y la figura interactiva. F_ref puede ser la función `evaluar`: la referencia se calcula por dentro, y se imprime
+    cuántas soluciones tiene y la correlación entre abatimiento y costo sobre ella (lo que hace angosta a la cinta)."""
+    if callable(F_ref):
+        F_ref = _referencia_3(F_ref); r = np.corrcoef(F_ref.T)
+        print(f"la referencia (gris): {len(F_ref)} no dominadas de una malla cada 20 m³/d; sobre ella, correlación abatimiento-costo {r[0, 1]:.2f}")
+    Fn, Fr = _normalizar_tres(F, F_ref)
+    frente_angulos(Fn, ejes=ejes, azimuts=(0, 45, 90, 135), referencia=Fr, punto=Fn[k], color="white",
+                   titulo="OMOPSO (blanco) sobre la referencia (gris); en rojo, la más cercana al origen")
+    frente_3d((Fr, "Referencia (malla)", "#9fb3c8", 2), (Fn, "Frente de Pareto", "white"), ejes=ejes,
+              punto=(Fn[k], "más cercana al origen"), titulo="Gíralo con el mouse; un clic en la leyenda oculta cada capa", alto=650).show()
+
+
+def caras_tres_objetivos(F, F_ref, k, ejes=("Abatimiento", "Costo", "Índice")):
+    """Sesión 3, sección 3.4.3: los tres pares de objetivos en 2-D, normalizados, con la solución k marcada."""
     import matplotlib.pyplot as plt
+    Fn, Fr = _normalizar_tres(F, _referencia_3(F_ref))
+    caras_frente((Fr, "Referencia (malla)", "#9fb3c8", 2), (Fn, "Frente de Pareto", "white"), ejes=ejes,
+                 punto=(Fn[k], "más cercana al origen"), titulo="Las caras del frente (normalizado)")
+    plt.show()
+
+
+def compromiso_tres_objetivos(Fn, k, X, evaluar, p_dos):
+    """Sesión 3, sección 3.5: los bombeos y los objetivos del compromiso de tres objetivos (solución k), contra el de dos objetivos
+    (p_dos), y su lectura en coordenadas paralelas y en el acuífero."""
+    p = X[k]; e = evaluar(p)
+    print(f"compromiso de tres objetivos: p = ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) = {p.sum():.0f} m³/d")
+    print(f"  abatimiento total {e['s'].sum():.2f} m | costo {e['costo']:.1f} $/d | índice {e['indice']:.3f} | humedal {e['humedal']:.3f} m")
+    print(f"compromiso de dos objetivos:  p = ({p_dos[0]:.0f}, {p_dos[1]:.0f}, {p_dos[2]:.0f}) = {p_dos.sum():.0f} m³/d")
+    paralelas_acuifero(Fn, ["abatimiento total", "costo", "índice"], k, p)
+
+
+def castigo_con_numeros(p, evaluar, funcion, Ms=(0, 10, 1000), s_max=3.0, s_hum=1.25):
+    """El castigo graduado con números (sesión 3, «Las restricciones dentro de OMOPSO»): para la decisión p imprime cuánto se pasa de las reglas
+    (v, en metros) y lo que la multa M·v le suma a cada objetivo de `funcion(p, M=M)` con cada M. 2026-11-16, ARP: la celda solo lleva el método."""
+    e = evaluar(p)
+    exc_s, exc_h = np.maximum(e["s"] - s_max, 0), max(e["humedal"] - s_hum, 0)
+    v = exc_s.sum() + exc_h
+    print(f"B: pozos {np.round(e['s'], 4)} m, humedal {e['humedal']:.4f} m -> excesos {np.round(exc_s, 4)} y {exc_h:.4f}: v = {v:.4f} m")
+    for M in Ms:
+        f = funcion(p, M=M).ravel()
+        print(f"M = {M:5d}: costo {e['costo']:.1f} + {M} × {v:.4f} = {f[0]:8.1f} $/d | índice {e['indice']:.3f} + {M} × {v:.4f} = {f[1]:8.3f}")
+
+
+def comparar_castigos(optimizador, parametros, casos, semillas=(42, 1, 2), n_var=3):
+    """Prueba cada planteamiento de `casos` = {nombre: (función, tope de bombeo, M)} con el optimizador, una corrida por semilla, e imprime una
+    tabla con cuántas soluciones quedan en el archivo. M = None usa la función tal cual; con un número, la llama con ese M (castigo graduado).
+    Pensada para corridas cortas de prueba (sesión 3, «Las restricciones dentro de OMOPSO»)."""
+    print(f"{'soluciones en el archivo':44s}  " + "  ".join(f"semilla {s:<3d}" for s in semillas))
+    for nombre, (funcion, tope, M) in casos.items():
+        f = funcion if M is None else (lambda x, funcion=funcion, M=M: funcion(x, M=float(M)))
+        cuenta = []
+        for s in semillas:
+            np.random.seed(s)
+            archivo, _, _ = optimizador({"CostFunction": f, "nVar": n_var, "VarMin": 0, "VarMax": tope}, parametros)
+            cuenta.append(len(archivo))
+        print(f"{nombre:44s}  " + "  ".join(f"{c:^11d}" for c in cuenta))
+
+
+def distancia_a_referencia(F_ref, F):
+    """Distancia media de cada solución de F a la más cercana del frente de referencia, en fracción del tamaño del frente
+    (cada objetivo dividido entre su rango en la referencia). La medida de calidad de la sesión 3, sección 2.5."""
+    escala = F_ref.max(0) - F_ref.min(0)
+    return float(np.mean([np.min(np.linalg.norm((F_ref - f) / escala, axis=1)) for f in F]))
+
+
+def frente_contra_referencia(F_ref, X_ref, F, X, xl="costo [$/d]", yl="índice de necesidad no cubierta"):
+    """OMOPSO (oro) contra la referencia de la malla (azul) en el espacio de objetivos y en el de decisión.
+    Antes de dibujar imprime cuántas soluciones hay y su distancia media a la referencia (2026-11-16, ARP: la medida sale de la celda)."""
+    import matplotlib.pyplot as plt
+    calidad_frente(F_ref, F)
     fig = plt.figure(figsize=(14, 5))
     ax1 = fig.add_subplot(1, 2, 1)
     frente_2d((F_ref, "referencia (malla)", "linea"), (F, "OMOPSO"), xl=xl, yl=yl, titulo="Espacio de objetivos", ax=ax1)
@@ -926,9 +1079,27 @@ def frente_contra_referencia(F_ref, X_ref, F, X, xl="costo [$/d]", yl="índice d
     plt.tight_layout(); plt.show()
 
 
-def compromiso_acuifero(F, k, p, xl="costo [$/d]", yl="índice", titulo="El compromiso sobre el frente", titulo_mapa="La solución de compromiso en el acuífero"):
-    """La solución k del frente F (en rojo) y, al lado, su abatimiento en el acuífero (hidra.simular(p))."""
+def compromiso_con_pesos(F, X, k, w, evaluar, k_iguales, xl="costo [$/d]", yl="índice de necesidad no cubierta"):
+    """El compromiso elegido con pesos w (solución k del frente F, bombeos X) contra el de pesos iguales (k_iguales): imprime los bombeos,
+    el costo y el índice de los dos y los marca sobre el frente (sesión 3, Tu turno 3; 2026-11-16, ARP: la celda solo lleva el método)."""
     import matplotlib.pyplot as plt
+    for etiqueta, j in ((f"pesos {tuple(w)}", k), ("pesos iguales", k_iguales)):
+        p = X[j]; e = evaluar(p)
+        print(f"{etiqueta:<15} p = ({p[0]:.0f}, {p[1]:.0f}, {p[2]:.0f}) = {p.sum():.0f} m³/d | costo {e['costo']:.1f} $/d | índice {e['indice']:.3f}")
+    fig, ax = plt.subplots(figsize=(7, 4.6))
+    frente_2d((F, "frente de OMOPSO"), punto=(F[k], f"compromiso con pesos {tuple(w)}"), xl=xl, yl=yl,
+              titulo="El compromiso se mueve sobre la misma curva", ax=ax)
+    ax.plot(F[k_iguales, 0], F[k_iguales, 1], "s", mfc="none", mec="k", mew=1.8, ms=11, label="compromiso con pesos iguales")
+    ax.legend(fontsize=9); plt.tight_layout(); plt.show()
+
+
+def compromiso_acuifero(F, k, p, e=None, xl="costo [$/d]", yl="índice", titulo="El compromiso sobre el frente", titulo_mapa="La solución de compromiso en el acuífero"):
+    """La solución k del frente F (en rojo) y, al lado, su abatimiento en el acuífero (hidra.simular(p)). Si se pasa `e` (lo que devuelve
+    `evaluar(p)`), imprime antes los bombeos, el costo, el índice y los abatimientos del compromiso (2026-11-16, ARP: la celda solo lleva el método)."""
+    import matplotlib.pyplot as plt
+    if e is not None:
+        print(f"compromiso de dos objetivos: p = {np.round(p, 1)} m³/d (total {p.sum():.0f})")
+        print(f"  costo {e['costo']:.1f} $/d | índice {e['indice']:.3f} | humedal {e['humedal']:.3f} m | pozos {np.round(e['s'], 2)} m")
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8))
     ax1.plot(F[:, 0], F[:, 1], "o", mfc="white", mec="k", ms=6, label="frente de OMOPSO")
     ax1.plot(F[k, 0], F[k, 1], "o", color="red", ms=10, label="solución de compromiso")

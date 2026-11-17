@@ -35,8 +35,8 @@ def particle_loop(leader, nPop, problem, pop, OMOPSO, it):
         e = OMOPSO['e']
         c1 = OMOPSO['c1']
         c2 = OMOPSO['c2']
-        nGrid = OMOPSO['nGrid']
-        alpha = OMOPSO['alpha']
+        nGrid = OMOPSO.get('nGrid', 7)
+        alpha = OMOPSO.get('alpha', 0.1)
         wdamp = OMOPSO['wdamp']
         r1 = OMOPSO['r1']
         r2 = OMOPSO['r2']

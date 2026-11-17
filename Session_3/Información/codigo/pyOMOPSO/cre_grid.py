@@ -2,8 +2,8 @@ import numpy as np
 
 def CreateGrid(rep, OMOPSO):
     
-    nGrid = OMOPSO['nGrid']
-    alpha = OMOPSO['alpha']
+    nGrid = OMOPSO.get('nGrid', 7)
+    alpha = OMOPSO.get('alpha', 0.1)
     c   = []      
 
     for i in range(0, len(rep)):
