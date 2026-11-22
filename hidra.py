@@ -1154,7 +1154,7 @@ def dos_cimas(f, xs, sigma, cimas=(2.0, 7.0)):
     fig, ax = plt.subplots(figsize=(9, 4.2))
     ax.plot(xs, f(xs), color=_AZUL, lw=2.5, label="f(x): lo que da cada decisión")
     for k, c in enumerate(cimas):
-        ax.axvspan(c - 2 * sigma, c + 2 * sigma, color=_ORO, alpha=0.18, label="x ± 2σ: donde puede caer x + δ" if k == 0 else None)
+        ax.axvspan(c - 2 * sigma, c + 2 * sigma, color=_ORO, alpha=0.18, label="x ± 2σ: donde puede caer X" if k == 0 else None)
         ax.plot(c, f(c), "*", ms=16, mfc=_ORO, mec="k")
         ax.annotate(f"x = {c:g}, f = {f(c):.2f}", (c, f(c)), xytext=(8, -4), textcoords="offset points", fontsize=10)
     ax.set_xlabel("x (la decisión)"); ax.set_ylabel("f(x)"); ax.set_ylim(0, 1.15); ax.legend(loc="upper right")
@@ -1162,19 +1162,19 @@ def dos_cimas(f, xs, sigma, cimas=(2.0, 7.0)):
 
 
 def esperanza_contra_f(xs, fx, Ex, sigma=None):
-    """f(x) contra su valor esperado E[f(x + δ)] y los dos óptimos: el determinista (el máximo de f) y el robusto (el máximo de E)."""
+    """f(x) contra su valor esperado E[f(X)], X ~ N(x, σ), y los dos óptimos: el determinista (el máximo de f) y el robusto (el máximo de E)."""
     import matplotlib.pyplot as plt
     xs, fx, Ex = np.asarray(xs), np.asarray(fx), np.asarray(Ex)
     fig, ax = plt.subplots(figsize=(9, 4.5))
     ax.plot(xs, fx, color=_AZUL, lw=2.5, label="f(x): sin incertidumbre")
-    ax.plot(xs, Ex, color=_ORO, lw=2.5, label="E[f(x + δ)]: con incertidumbre" + (f" (σ = {sigma})" if sigma is not None else ""))
+    ax.plot(xs, Ex, color=_ORO, lw=2.5, label="E[f(X)]: con incertidumbre" + (f" (σ = {sigma})" if sigma is not None else ""))
     ax.plot(xs[np.argmax(fx)], fx.max(), "*", ms=18, mfc=_AZUL, mec="k", label=f"óptimo determinista: x = {xs[np.argmax(fx)]:.1f}")
     ax.plot(xs[np.argmax(Ex)], Ex.max(), "*", ms=18, mfc=_ORO, mec="k", label=f"óptimo robusto: x = {xs[np.argmax(Ex)]:.1f}")
     ax.set_xlabel("x"); ax.set_ylabel("valor"); ax.legend(); ax.set_title("La cima angosta no resiste la incertidumbre")
     fig.tight_layout(); plt.show()
 
 
-def error_montecarlo(N, curvas):
+def error_montecarlo(N, curvas, ylabel="E[f(X)] estimada", xlabel="número de muestras N"):
     """La media acumulada con las primeras N muestras y su banda de ± 2 errores estándar. curvas: {etiqueta: (media_acumulada, error)}."""
     import matplotlib.pyplot as plt
     colores = [_AZUL, _ORO, _ROJO, _VERDE]
@@ -1183,7 +1183,7 @@ def error_montecarlo(N, curvas):
         c = colores[k % len(colores)]
         ax.fill_between(N, media - 2 * error, media + 2 * error, color=c, alpha=0.2)
         ax.plot(N, media, color=c, lw=2, label=f"x = {etiqueta}" if not isinstance(etiqueta, str) else etiqueta)
-    ax.set_xscale("log"); ax.set_xlabel("número de muestras N"); ax.set_ylabel("E[f(x + δ)] estimada"); ax.legend()
+    ax.set_xscale("log"); ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.legend()
     ax.set_title("La estimación se estabiliza como 1/√N (la banda: ± 2 errores estándar)"); fig.tight_layout(); plt.show()
 
 
@@ -1201,7 +1201,7 @@ def menu_robusto(xs, Ex, X_ce, F_ce):
     """El menú de dos objetivos del ejemplo de las dos cimas: el costo de la decisión (x) contra lo que se espera (E[f]); OMOPSO sobre la curva de todas las decisiones."""
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(9, 4.5))
-    ax.plot(xs, Ex, color="#c9d6e4", lw=3, label="E[f(x + δ)] de todas las decisiones")
+    ax.plot(xs, Ex, color="#c9d6e4", lw=3, label="E[f(X)] de todas las decisiones")
     ax.plot(X_ce[:, 0], 1.5 - F_ce[:, 1], "o", mfc=_ORO, mec="k", ms=6, label=f"el frente de OMOPSO ({len(F_ce)} soluciones)")
     ax.set_xlabel("costo de la decisión (x)"); ax.set_ylabel("lo que se espera, E[f]"); ax.legend(loc="upper left")
     ax.set_title("El menú robusto: dos tramos"); fig.tight_layout(); plt.show()
@@ -1219,7 +1219,7 @@ def costo_robustez_miniatura(sigmas, E_rob, x_rob, promesa=1.0):
     ax.set_title("El costo de la robustez crece con la incertidumbre"); fig.tight_layout(); plt.show()
 
 
-def mapas_ensamble(logK, n=10, vmin=-8.5, vmax=-4.5, columnas=5):
+def mapas_ensamble(logK, n=10, vmin=-8.5, vmax=-4.5, columnas=5, titulo=None, nombre="geología"):
     """Las primeras n geologías de un ensamble (campos de ln K) con los pozos y el humedal, en una cuadrícula."""
     import matplotlib.pyplot as plt
     n = min(n, len(logK)); filas = int(np.ceil(n / columnas))
@@ -1231,9 +1231,285 @@ def mapas_ensamble(logK, n=10, vmin=-8.5, vmax=-4.5, columnas=5):
         for j, (x, y) in enumerate(pozos_xy()):
             ax.plot(x, y, "o", ms=7, mfc="yellow", mec="k"); ax.annotate(str(j + 1), (x, y), xytext=(5, 4), textcoords="offset points", fontsize=9)
         ax.plot(*humedal_xy(), "P", ms=9, mfc="#8fd18f", mec="k")
-        ax.set_title(f"geología {k}"); ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"{nombre} {k}"); ax.set_xticks([]); ax.set_yticks([])
     fig.colorbar(im, ax=ejes, label="ln K", shrink=0.6)
+    if titulo: fig.suptitle(titulo, fontsize=14)
     plt.show()
+
+
+def resumen_ensamble(logK, vmin=-8.5, vmax=-4.5):
+    """Lo que solo se ve juntando todas las geologías: el promedio de ln K y su desviación estándar celda por celda, con los pozos y el humedal.
+    Devuelve (media, desviación) en cada pozo."""
+    import matplotlib.pyplot as plt
+    L = np.asarray(logK); m = L.mean(axis=0); s = L.std(axis=0)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(13, 5.4))
+    i1 = a1.imshow(m, origin="lower", extent=[0, LADO, 0, LADO], cmap="RdBu_r", vmin=vmin, vmax=vmax)
+    i2 = a2.imshow(s, origin="lower", extent=[0, LADO, 0, LADO], cmap="viridis", vmin=0, vmax=max(1.2, float(s.max())))
+    en_pozos = []
+    for ax in (a1, a2):
+        for j, (x, y) in enumerate(pozos_xy()):
+            ax.plot(x, y, "o", ms=9, mfc="yellow", mec="k"); ax.annotate(f"pozo {j + 1}", (x, y), xytext=(6, 5), textcoords="offset points", fontsize=10, color="k" if ax is a1 else "w")
+        ax.plot(*humedal_xy(), "P", ms=11, mfc="#8fd18f", mec="k"); ax.set_xticks([]); ax.set_yticks([])
+    for x, y in pozos_xy():
+        i, k = min(int(y / LADO * L.shape[1]), L.shape[1] - 1), min(int(x / LADO * L.shape[2]), L.shape[2] - 1)
+        en_pozos.append((float(m[i, k]), float(s[i, k])))
+    a1.set_title(f"El promedio de ln K en las {len(L)} geologías"); a2.set_title("La desviación estándar de ln K")
+    fig.colorbar(i1, ax=a1, label="ln K promedio", shrink=0.8); fig.colorbar(i2, ax=a2, label="desviación de ln K", shrink=0.8)
+    fig.tight_layout(); plt.show()
+    return en_pozos
+
+
+def lnK_en_pozos(logK):
+    """Cajas con el ln K de cada pozo en todas las geologías del ensamble: cuánto varía la conductividad donde está cada pozo.
+    Devuelve una lista (mediana, percentil 5, percentil 95) por pozo."""
+    import matplotlib.pyplot as plt
+    L = np.asarray(logK); datos = []
+    for x, y in pozos_xy():
+        i, k = min(int(y / LADO * L.shape[1]), L.shape[1] - 1), min(int(x / LADO * L.shape[2]), L.shape[2] - 1)
+        datos.append(L[:, i, k])
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    ax.boxplot(datos, widths=0.5, patch_artist=True, boxprops=dict(facecolor="#c9d6e4"), medianprops=dict(color=_ROJO, lw=2))
+    for j, d in enumerate(datos):
+        ax.plot(np.random.default_rng(j).normal(j + 1, 0.06, len(d)), d, "o", ms=3, color=_AZUL, alpha=0.35)
+    ax.set_xticks(range(1, len(datos) + 1)); ax.set_xticklabels([f"pozo {j + 1}" for j in range(len(datos))])
+    ax.set_ylabel("ln K en el pozo"); ax.set_title(f"La conductividad donde está cada pozo, en las {len(L)} geologías")
+    fig.tight_layout(); plt.show()
+    return [(float(np.median(d)), float(np.percentile(d, 5)), float(np.percentile(d, 95))) for d in datos]
+
+
+def decision_en_ensamble(S, Hh, s_hom, h_hom, n=8, s_max=3.0, s_hum=1.25):
+    """Una decisión en el ensamble, en dos paneles. Izquierda: barras de los tres pozos y el humedal en las n primeras geologías (coral si se pasa del límite),
+    con el límite y lo que prometía el homogéneo. Derecha: pozo 1 contra pozo 2 en todas las geologías, con el cuadro donde los dos cumplen; el color dice si la
+    decisión rompe alguna regla (contando el pozo 3 y el humedal). S: (N, 3); Hh: (N,)."""
+    import matplotlib.pyplot as plt
+    S = np.asarray(S); Hh = np.asarray(Hh); N = len(S)
+    vals = np.column_stack([S, Hh]); lim = np.array([s_max] * 3 + [s_hum]); hom = np.append(s_hom, h_hom)
+    rompe = (S > s_max + 1e-9).any(axis=1) | (Hh > s_hum + 1e-9)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(15, 5.2), gridspec_kw=dict(width_ratios=[1.35, 1]))
+    nombres = ("pozo 1", "pozo 2", "pozo 3", "humedal"); w = 0.2
+    for k in range(n):
+        for j in range(4):
+            v = vals[k, j]; x = k + (j - 1.5) * w
+            a1.bar(x, min(v, 12), w * 0.9, color=_ROJO if v > lim[j] + 1e-9 else _VERDE, edgecolor="k", lw=0.4)
+            a1.plot([x - w * 0.45, x + w * 0.45], [hom[j], hom[j]], "-", color=_ORO, lw=3.2, label="lo que prometía el homogéneo" if k == j == 0 else None)
+            a1.plot([x - w * 0.45, x + w * 0.45], [lim[j], lim[j]], "--", color="k", lw=1.4, label="límite (3 m en los pozos, 1.25 m en el humedal)" if k == j == 0 else None)
+    a1.set_xticks(range(n)); a1.set_xticklabels([f"geología {k}\n" + ("ROMPE" if rompe[k] else "cumple") for k in range(n)], fontsize=9)
+    a1.set_ylabel("abatimiento [m]"); a1.set_ylim(0, 12.5); a1.legend(fontsize=9, loc="upper left")
+    a1.set_title("Las primeras geologías: barras de izquierda a derecha = pozo 1, 2, 3 y humedal (coral: se pasa)", fontsize=10.5)
+    a2.add_patch(plt.Rectangle((0, 0), s_max, s_max, color=_VERDE, alpha=0.15, label="los dos pozos cumplen"))
+    a2.scatter(S[~rompe, 0], S[~rompe, 1], s=22, color=_VERDE, edgecolor="k", lw=0.3, label=f"cumple todo ({(~rompe).sum()})")
+    a2.scatter(S[rompe, 0], np.minimum(S[rompe, 1], 24.5), s=22, color=_ROJO, edgecolor="k", lw=0.3, alpha=0.8, label=f"rompe alguna regla ({rompe.sum()})")
+    a2.plot(s_hom[0], s_hom[1], "*", ms=20, color=_ORO, mec="k", label="lo que prometía el homogéneo")
+    a2.axvline(s_max, color=_ROJO, ls="--", lw=1.2); a2.axhline(s_max, color=_ROJO, ls="--", lw=1.2)
+    a2.set_xlim(0, max(16, float(S[:, 0].max()) + 0.5)); a2.set_ylim(0, 25)
+    a2.set_xlabel("abatimiento del pozo 1 [m]"); a2.set_ylabel("abatimiento del pozo 2 [m]"); a2.legend(fontsize=9, loc="upper right")
+    a2.set_title(f"Las {N} geologías: cada punto es una", fontsize=11)
+    fig.tight_layout(); plt.show()
+
+
+def variable_aleatoria(X, nombre="abatimiento del pozo 1 [m]", limite=None, semilla=0):
+    """Introducción básica a una variable aleatoria, en dos paneles. Izquierda: un dado lanzado 12, 120 y 12 000 veces; la frecuencia de cada cara se acerca a 1/6
+    (su distribución). Derecha: X, una variable aleatoria del acuífero (un valor por geología): su histograma es una estimación de su distribución p(x)."""
+    import matplotlib.pyplot as plt
+    rng = np.random.default_rng(semilla); X = np.asarray(X)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(14, 4.6))
+    for k, (n, c) in enumerate(((12, _GRIS), (120, _AZUL), (12000, _ORO))):
+        caras = rng.integers(1, 7, n); f = np.bincount(caras, minlength=7)[1:] / n
+        a1.bar(np.arange(1, 7) + (k - 1) * 0.27, f, 0.25, color=c, label=f"{n} lanzamientos")
+    a1.axhline(1 / 6, color="k", ls="--", lw=1.5, label="1/6: la distribución del dado")
+    a1.set_xticks(range(1, 7)); a1.set_xlabel("cara del dado (el valor x que toma X)"); a1.set_ylabel("fracción de lanzamientos")
+    a1.set_title("Un dado: no sé qué saldrá, pero sé con qué probabilidad"); a1.legend(fontsize=9)
+    a2.hist(X, bins=30, density=True, color="#2E7DB5", edgecolor="k", alpha=0.85, label=f"{len(X)} valores, uno por geología")
+    if limite is not None:
+        a2.axvline(limite, color=_ROJO, ls="--", lw=2, label=f"límite: {limite:g} m")
+    a2.set_xlabel(nombre); a2.set_ylabel("p(x) estimada"); a2.legend(fontsize=9)
+    a2.set_title("El acuífero: no sé qué geología es la real, pero tengo 200 posibles")
+    fig.tight_layout(); plt.show()
+
+
+def tres_objetivos(p, s, costo, indice, titulo="Cómo se arma cada objetivo"):
+    """Los tres objetivos de una decisión, pozo por pozo: abatimiento s_i, costo c_i p_i (H_i − h_i⁰ + s_i) y término del índice exp(−k (c_i⁰ + a_i p_i)).
+    Cada panel suma sus tres barras: ese es el objetivo."""
+    import matplotlib.pyplot as plt
+    pozos = [f"pozo {j + 1}\n{p[j]:.0f} m³/d" for j in range(3)]
+    fig, ejes = plt.subplots(1, 3, figsize=(15, 4.2))
+    for ax, v, nom, u, c in zip(ejes, (s, costo, indice), ("Abatimiento total", "Costo", "Índice de necesidad"), ("m", "$/d", ""), (_AZUL, _ORO, _VERDE)):
+        v = np.asarray(v, dtype=float); b = ax.bar(pozos, v, color=c, edgecolor="k")
+        for r, x in zip(b, v): ax.text(r.get_x() + r.get_width() / 2, x, f"{x:.2f}" if x < 10 else f"{x:.1f}", ha="center", va="bottom", fontsize=11)
+        ax.set_title(f"{nom} = {v.sum():.2f} {u}".strip(), fontsize=12); ax.set_ylim(0, v.max() * 1.25)
+    ejes[0].set_ylim(0, max(3.4, float(np.max(s)) * 1.25)); ejes[0].axhline(3, color=_ROJO, ls="--", lw=1.5); ejes[0].text(2.45, 3.07, "límite 3 m por pozo", color=_ROJO, ha="right")
+    fig.suptitle(titulo, fontsize=13); fig.tight_layout(); plt.show()
+
+
+def decision_en_matrices(casos, s_max=3.0, s_hum=1.25):
+    """La misma decisión con varias matrices (el homogéneo y algunas geologías): barras de los tres pozos y el humedal por caso, coral si se pasa.
+    casos: lista de (nombre, s3, sh, abatimiento_total, costo)."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(13, 4.6)); w = 0.2; lim = [s_max] * 3 + [s_hum]
+    for k, (nombre, s3, sh, S, C) in enumerate(casos):
+        vals = list(s3) + [sh]
+        for j, v in enumerate(vals):
+            x = k + (j - 1.5) * w
+            ax.bar(x, v, w * 0.9, color=_ROJO if v > lim[j] + 1e-9 else _VERDE, edgecolor="k", lw=0.4)
+            ax.plot([x - w * 0.45, x + w * 0.45], [lim[j], lim[j]], "--", color="k", lw=1.4, label="límite (3 m en los pozos, 1.25 m en el humedal)" if k == j == 0 else None)
+            ax.text(x, v + 0.12, f"{v:.1f}", ha="center", fontsize=8.5)
+        ax.text(k, -1.25, f"total {S:.1f} m · {C:.0f} $/d", ha="center", fontsize=10, color=_AZUL)
+    ax.set_xticks(range(len(casos))); ax.set_xticklabels([c[0] for c in casos], fontsize=11)
+    ax.set_ylim(-1.6, max(max(list(c[1]) + [c[2]]) for c in casos) * 1.15); ax.axhline(0, color="k", lw=0.8)
+    ax.set_ylabel("abatimiento [m]"); ax.legend(fontsize=9, loc="upper right")
+    ax.set_title("La misma decisión con cuatro matrices: barras de izquierda a derecha = pozo 1, 2, 3 y humedal (coral: se pasa)", fontsize=11)
+    fig.tight_layout(); plt.show()
+
+
+def bombeos_frente(X, indice, titulo="Qué decisiones hay en el frente"):
+    """Las decisiones de un frente ordenadas por el índice de necesidad: cuánto bombea cada pozo (barras apiladas) y el índice (línea).
+    A la izquierda, poco bombeo e índice alto; a la derecha, mucho bombeo e índice bajo."""
+    import matplotlib.pyplot as plt
+    X = np.asarray(X); indice = np.asarray(indice); o = np.argsort(-indice); Xo = X[o]
+    fig, ax = plt.subplots(figsize=(13, 4.4)); x = np.arange(len(Xo)); base = np.zeros(len(Xo))
+    for j, c in enumerate((_AZUL, _ORO, _VERDE)):
+        ax.bar(x, Xo[:, j], 1.0, bottom=base, color=c, label=f"pozo {j + 1}"); base += Xo[:, j]
+    ax.set_xlabel(f"las {len(Xo)} decisiones, de la que menos bombea a la que más (ordenadas por el índice)"); ax.set_ylabel("bombeo [m³/d]")
+    a2 = ax.twinx(); a2.plot(x, indice[o], color="k", lw=2, label="índice de necesidad"); a2.set_ylabel("índice de necesidad")
+    h1, l1 = ax.get_legend_handles_labels(); h2, l2 = a2.get_legend_handles_labels(); ax.legend(h1 + h2, l1 + l2, loc="upper center", fontsize=9, ncol=4)
+    ax.set_title(titulo, fontsize=12); fig.tight_layout(); plt.show()
+
+
+def receta_propagacion(logK, A, H, p, n_mapas=3, s_max=3.0, s_hum=1.25):
+    """La receta de propagación en cuatro paneles, con los datos del ensamble: 1 caracterizar (la distribución de ln K), 2 generar (algunas geologías),
+    3 simular (la decisión p en esas geologías: s = α_k p) y 4 hacer estadística (el pozo 1 en todas, con su media)."""
+    import matplotlib.pyplot as plt
+    L = np.asarray(logK); A = np.asarray(A); H = np.asarray(H); p = np.asarray(p, dtype=float)
+    S = A @ p; Hh = H @ p
+    fig = plt.figure(figsize=(16, 4.6)); gs = fig.add_gridspec(2, 3 + n_mapas, height_ratios=[1, 1])
+    a1 = fig.add_subplot(gs[:, 0]); a1.hist(L.ravel(), bins=50, color=_GRIS, density=True)
+    a1.set_title("1 · Caracterizar\nla distribución de ln K", fontsize=11); a1.set_xlabel("ln K"); a1.set_yticks([])
+    for k in range(n_mapas):
+        ax = fig.add_subplot(gs[0, 1 + k]); ax.imshow(L[k], origin="lower", extent=[0, LADO, 0, LADO], cmap="RdBu_r", vmin=-8.5, vmax=-4.5)
+        for x, y in pozos_xy(): ax.plot(x, y, "o", ms=4, mfc="yellow", mec="k")
+        ax.set_xticks([]); ax.set_yticks([]); ax.set_title(f"geología {k}", fontsize=9)
+        if k == n_mapas // 2: ax.text(0.5, 1.32, "2 · Generar realizaciones", transform=ax.transAxes, ha="center", fontsize=11)
+        bx = fig.add_subplot(gs[1, 1 + k]); vals = list(S[k]) + [Hh[k]]; lim = [s_max] * 3 + [s_hum]
+        bx.bar(range(4), vals, color=[_ROJO if v > l + 1e-9 else _VERDE for v, l in zip(vals, lim)], edgecolor="k", lw=0.4)
+        for j, l in enumerate(lim): bx.plot([j - 0.4, j + 0.4], [l, l], "--", color="k", lw=1)
+        bx.set_xticks(range(4)); bx.set_xticklabels(["p1", "p2", "p3", "hum"], fontsize=8); bx.tick_params(axis="y", labelsize=8)
+        if k == 0: bx.set_ylabel("s [m]", fontsize=9)
+        if k == n_mapas // 2: bx.set_title("3 · Simular cada una: s = α·p", fontsize=11)
+    a4 = fig.add_subplot(gs[:, 1 + n_mapas:]); a4.hist(S[:, 0], bins=30, color="#2E7DB5", edgecolor="k")
+    a4.axvline(S[:, 0].mean(), color=_ORO, lw=2.5, label=f"media {S[:, 0].mean():.2f} m"); a4.axvline(s_max, color=_ROJO, ls="--", lw=2, label=f"límite {s_max:g} m")
+    a4.set_title(f"4 · Hacer estadística\nel pozo 1 en las {len(S)} geologías", fontsize=11); a4.set_xlabel("abatimiento del pozo 1 [m]"); a4.legend(fontsize=9)
+    fig.tight_layout(); plt.show()
+
+
+def funcion_efectiva(F_geo, F_hom, n_marcas=5, ejes=("Abatimiento total [m]", "Costo [$/d]")):
+    """Cómo se forma la función efectiva de una decisión: para cada objetivo, su valor en cada geología (puntos; las primeras n_marcas numeradas)
+    y el promedio con las primeras N geologías (línea), que termina en f_eff; la línea punteada es lo que prometía un solo modelo."""
+    import matplotlib.pyplot as plt
+    F_geo = np.asarray(F_geo); N = np.arange(1, len(F_geo) + 1)
+    fig, ejes_ = plt.subplots(1, 2, figsize=(15, 4.5))
+    for j, (ax, nom) in enumerate(zip(ejes_, ejes)):
+        v = F_geo[:, j]; prom = np.cumsum(v) / N
+        ax.scatter(N, v, s=12, color="#2E9BB5", alpha=0.5, label="f(y): la decisión en la geología k")
+        ax.scatter(N[:n_marcas], v[:n_marcas], s=60, color=_ORO, edgecolor="k", zorder=4, label=f"las geologías 0 a {n_marcas - 1} de la tabla")
+        ax.plot(N, prom, color=_VERDE, lw=2.8, label=f"promedio con las primeras N: termina en f_eff = {prom[-1]:.1f}")
+        ax.axhline(F_hom[j], color=_ORO, ls="--", lw=2, label=f"lo que prometía un solo modelo: {F_hom[j]:.1f}")
+        ax.set_xlabel("geología k (N = cuántas llevamos)"); ax.set_ylabel(nom.replace("$", r"\$")); ax.legend(fontsize=9, loc="upper right")
+        ax.set_title(f"{nom.split(' [')[0]}: sumar los {len(v)} resultados y dividir entre {len(v)}", fontsize=11)
+    fig.tight_layout(); plt.show()
+
+
+def suma_acumulada(F_geo, ejes=("Abatimiento total [m]", "Costo [$/d]")):
+    """La integral como suma: para cada objetivo, la suma de los resultados de la decisión con las primeras N geologías (crece con cada geología)."""
+    import matplotlib.pyplot as plt
+    F_geo = np.asarray(F_geo); N = np.arange(1, len(F_geo) + 1)
+    fig, ejes_ = plt.subplots(1, 2, figsize=(15, 4.2))
+    for j, (ax, nom) in enumerate(zip(ejes_, ejes)):
+        c = np.cumsum(F_geo[:, j]); ax.fill_between(N, 0, c, color="#2E9BB5", alpha=0.25); ax.plot(N, c, color=_AZUL, lw=2.5)
+        ax.plot(N[-1], c[-1], "o", ms=10, color=_ORO, mec="k")
+        ax.text(0.03, 0.9, f"suma de los {len(c)}: {c[-1]:,.0f}".replace(",", " "), transform=ax.transAxes, fontsize=12, color=_AZUL, fontweight="bold")
+        ax.set_xlabel("geologías sumadas (N)"); ax.set_ylabel(("suma del " + nom.lower()).replace("$", r"\$")); ax.set_title(f"{nom.split(' [')[0]}: cada geología agrega su resultado", fontsize=11)
+    fig.tight_layout(); plt.show()
+
+
+def cuenta_evaluaciones(llamadas, n_geologias, titulo="Cuántas veces se evalúa el modelo"):
+    """Lo que cuesta la robustez en cómputo: llamadas a la función objetivo (iguales en los dos casos) y simulaciones del modelo (×N geologías en el robusto).
+    llamadas: número de llamadas de una corrida."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(10, 4.2))
+    et = ["llamadas a la función objetivo\n(determinista y robusto)", "simulaciones del modelo\n(determinista: 1 por llamada)", f"simulaciones del modelo\n(robusto: {n_geologias} por llamada)"]
+    v = [llamadas, llamadas, llamadas * n_geologias]; b = ax.barh(et, v, color=[_GRIS, _AZUL, _ROJO])
+    for r, x in zip(b, v): ax.text(x * 1.15, r.get_y() + r.get_height() / 2, f"{x:,}".replace(",", " "), va="center", fontsize=12, fontweight="bold")
+    ax.set_xscale("log"); ax.set_xlim(1, v[-1] * 20); ax.set_xlabel("número (escala logarítmica)"); ax.invert_yaxis(); ax.set_title(titulo, fontsize=12)
+    fig.tight_layout(); plt.show()
+
+
+def enjambre_dos_calificaciones(F_det, F_rob, nd_det, nd_rob, ejes=("Abatimiento total [m]", "Costo [$/d]")):
+    """El mismo enjambre calificado de dos maneras: con un solo modelo (izquierda) y con el promedio de las geologías (derecha). En oro, las partículas que no
+    domina ninguna otra: las que entrarían al archivo. Las flechas grises unen cada partícula con su calificación robusta."""
+    import matplotlib.pyplot as plt
+    F_det = np.asarray(F_det); F_rob = np.asarray(F_rob)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(15, 5), sharey=True)
+    for ax, F, nd, tit in ((a1, F_det, nd_det, "calificado con un solo modelo"), (a2, F_rob, nd_rob, "calificado con el promedio de las geologías")):
+        ax.scatter(F[:, 0], F[:, 1], s=40, color="#2E9BB5", edgecolor="k", lw=0.3, label="partícula")
+        ax.scatter(F[nd, 0], F[nd, 1], s=110, color=_ORO, edgecolor="k", zorder=4, label=f"no dominada: entra al archivo ({int(np.sum(nd))})")
+        ax.set_xlabel(ejes[0]); ax.set_title(tit, fontsize=12); ax.legend(fontsize=9, loc="upper left")
+    for (x0, y0) in F_det[:0]: pass
+    a1.set_ylabel(ejes[1].replace("$", r"\$")); a1.set_xlim(0, max(F_rob[:, 0].max(), F_det[:, 0].max()) * 1.05); a2.set_xlim(a1.get_xlim())
+    fig.suptitle("El mismo enjambre, dos calificaciones: OMOPSO solo ve los números que le devuelve la función", fontsize=13); fig.tight_layout(); plt.show()
+
+
+def castigo_en_promedio(s_prom, h_prom, castigo, s_max=3.0, s_hum=1.25):
+    """El castigo del OMOPSO robusto: para cada partícula, el abatimiento PROMEDIO de su pozo más exigido (barras, coral si pasa de 3 m) y el castigo M·v que
+    se suma a sus objetivos (puntos)."""
+    import matplotlib.pyplot as plt
+    s_prom = np.asarray(s_prom); peor = s_prom.max(axis=1); o = np.argsort(peor); x = np.arange(len(peor))
+    fig, ax = plt.subplots(figsize=(13, 4.4))
+    ax.bar(x, peor[o], color=[_ROJO if v > s_max + 1e-9 else _VERDE for v in peor[o]], edgecolor="k", lw=0.3)
+    ax.axhline(s_max, color="k", ls="--", lw=1.5, label="límite: 3 m en promedio")
+    ax.set_xlabel("las partículas del enjambre, de la que menos abate a la que más"); ax.set_ylabel("abatimiento promedio del pozo más exigido [m]")
+    a2 = ax.twinx(); a2.plot(x, np.asarray(castigo)[o], "o", color=_ORO, mec="k", label="castigo M·v que se suma a los objetivos"); a2.set_ylabel("castigo")
+    h1, l1 = ax.get_legend_handles_labels(); h2, l2 = a2.get_legend_handles_labels(); ax.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=9)
+    ax.set_title(f"Las reglas se revisan con el promedio: {int((peor > s_max + 1e-9).sum())} de {len(peor)} partículas pagan castigo por algún pozo", fontsize=12)
+    fig.tight_layout(); plt.show()
+
+
+def llamadas_contra_tiempo(escenarios, n_llamadas, n_geologias=200, referencias=()):
+    """Tiempo de cómputo contra número de llamadas a la función objetivo (log-log). escenarios: lista de (segundos por llamada, nombre, de dónde sale, color,
+    estilo). Marca la corrida de n_llamadas con su duración y escribe junto a cada recta de dónde sale el tiempo por corrida."""
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+    n = np.logspace(0, np.log10(n_llamadas * 4), 200)
+    fig, ax = plt.subplots(figsize=(13, 7.2))
+    Ts = sorted(n_llamadas * e[0] for e in escenarios)
+    for k, (t1, nombre, fuente, c, ls) in enumerate(escenarios):
+        ax.plot(n, n * t1, ls, color=c, lw=2.4, label=f"{nombre}: {fuente}")
+        T = n_llamadas * t1; ax.plot(n_llamadas, T, "o", ms=9, color=c, mec="k", zorder=5)
+        j = Ts.index(T)                                     # separa los rótulos que caen juntos: el de abajo baja, el de arriba sube un poco
+        dy = -16 if (j + 1 < len(Ts) and Ts[j + 1] / T < 3) else (2 if (j > 0 and T / Ts[j - 1] < 3) else -4)
+        ax.annotate(_duracion(T), (n_llamadas, T), xytext=(9, dy), textcoords="offset points", fontsize=11, color=c, fontweight="bold")
+        xl = 1.15 * 6 ** (k % 3)                            # los nombres, escalonados a lo largo del eje
+        ax.text(xl, xl * t1 * 2.2, nombre, color=c, fontsize=9.5, va="bottom", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+    ax.set_xscale("log"); ax.set_yscale("log")
+    for seg, et, c in referencias:                          # tiempos totales publicados (una línea horizontal con su origen)
+        ax.axhline(seg, color=c, lw=2, ls=(0, (6, 2, 1, 2))); ax.text(1.15, seg * 1.25, et, color=c, fontsize=9.5, va="bottom", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+    for seg, et in ((1, "1 segundo"), (60, "1 minuto"), (3600, "1 hora"), (86400, "1 día"), (86400 * 365, "1 año")):
+        ax.axhline(seg, color=_GRIS, lw=0.8, ls=":"); ax.text(n[-1], seg * 1.12, et, color=_GRIS, fontsize=9, ha="right", va="bottom")
+    ax.axvline(n_llamadas, color=_ORO, lw=1.5)
+    ax.text(n_llamadas / 1.08, ax.get_ylim()[0] * 2, f"la corrida de la 2.3:\n{n_llamadas:,} llamadas".replace(",", " "), color=_ORO, fontsize=10, ha="right", va="bottom")
+    def etiqueta(v, _):
+        e = int(round(np.log10(v))) if v > 0 else 0
+        return f"$10^{{{e}}}$\n({v:,.0f})".replace(",", " ") if abs(np.log10(v) - e) < 1e-6 else ""
+    ax.xaxis.set_major_formatter(FuncFormatter(etiqueta))
+    ax.set_xlabel("número de llamadas a la función objetivo"); ax.set_ylabel("tiempo de cómputo [s]")
+    ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=1, frameon=False)
+    ax.set_title(f"El mismo número de llamadas; en el robusto, {n_geologias} simulaciones en cada una", fontsize=12)
+    fig.tight_layout(); plt.show()
+
+def _duracion(seg):
+    """Un tiempo en segundos, en la unidad más legible."""
+    for u, d in (("años", 86400 * 365), ("días", 86400), ("h", 3600), ("min", 60), ("s", 1)):
+        if seg >= d: return f"{seg / d:.1f} {u}"
+    return f"{seg * 1e3:.1f} ms"
 
 
 def histograma_riesgo(riesgos, riesgo_max=None, titulo="¿Qué tan seguido falla cada frente?", xl="riesgo en 200 geologías de validación"):
@@ -1245,6 +1521,46 @@ def histograma_riesgo(riesgos, riesgo_max=None, titulo="¿Qué tan seguido falla
     if riesgo_max is not None:
         ax.axvline(riesgo_max, color="#1f5fbf", ls="--", lw=2, label=f"riesgo pedido: {riesgo_max:.0%}")
     ax.set_xlabel(xl); ax.set_ylabel("decisiones"); ax.legend(fontsize=9); ax.set_title(titulo); fig.tight_layout(); plt.show()
+
+
+def promedio_contra_riesgo(frentes, marca=None, s_max=3.0):
+    """Cumplir en promedio no es cumplir: cada decisión como un punto, con el abatimiento promedio del pozo más exigido (eje x) y su riesgo (eje y).
+    frentes: {nombre: (promedios, riesgos, color)}; marca: (promedio, riesgo, texto) de una decisión a señalar."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(9.5, 5.2))
+    xmax = max(float(np.max(v[0])) for v in frentes.values()) * 1.05 + 0.3
+    ax.axvspan(0, s_max, color=_VERDE, alpha=0.12, label=f"cumple en promedio (abajo de {s_max:g} m)")
+    ax.axvline(s_max, color=_ROJO, ls="--", lw=1.5)
+    for nombre, (prom, r, color) in frentes.items():
+        ax.scatter(prom, 100 * np.asarray(r), s=22, color=color, edgecolor="k", lw=0.3, alpha=0.75, label=f"{nombre} ({len(prom)} decisiones)")
+    if marca is not None:
+        ax.plot(marca[0], 100 * marca[1], "*", ms=22, color=_ORO, mec="k", zorder=5)
+        ax.annotate(f"{marca[2]}:\ncumple en promedio\ny rompe en {marca[1]:.0%}", (marca[0], 100 * marca[1]), xytext=(marca[0] + 5.0, 100 * marca[1] - 30),
+                    fontsize=10.5, color=_ORO, fontweight="bold", bbox=dict(fc="white", ec=_ORO), arrowprops=dict(arrowstyle="->", color=_ORO, lw=1.5))
+    ax.set_xlim(0, xmax); ax.set_ylim(-3, 103)
+    ax.set_xlabel("abatimiento promedio del pozo más exigido [m]"); ax.set_ylabel("riesgo: geologías en que rompe [%]")
+    ax.legend(fontsize=9, loc="lower right"); ax.set_title("El promedio contra el riesgo: cada punto es una decisión")
+    fig.tight_layout(); plt.show()
+
+
+def nube_decision(F_geo, F_modelo, frente=None, verde=None, ejes=("Abatimiento total [m]", "Costo [$/d]"), titulo=None, promedio=True, n_marcas=0):
+    """Robustez de tipo I con una decisión (lámina «Solución robusta de tipo I»): sus resultados en cada geología (la nube B(x)), lo que prometía un
+    solo modelo y el promedio, sobre el plano de los dos primeros objetivos. F_geo: (N, ≥2); F_modelo: (≥2,); frente y verde: (n, ≥2) opcionales."""
+    import matplotlib.pyplot as plt
+    F_geo = np.asarray(F_geo); prom = F_geo.mean(axis=0)
+    fig, ax = plt.subplots(figsize=(8.5, 5.2))
+    if frente is not None:
+        ax.scatter(frente[:, 0], frente[:, 1], s=10, color="#333333", alpha=0.6, label="frente negro: un solo modelo")
+    if verde is not None:
+        ax.scatter(verde[:, 0], verde[:, 1], s=10, color="#2e9b4f", alpha=0.6, label="verde: el promedio de cada decisión")
+    ax.scatter(F_geo[:, 0], F_geo[:, 1], s=16, color="#2E9BB5", alpha=0.45, label=f"B(x): la decisión en {len(F_geo)} geologías")
+    ax.plot(F_modelo[0], F_modelo[1], "o", ms=12, mfc="none", mec=_ORO, mew=2.5, label=f"lo que prometía un solo modelo: ({F_modelo[0]:.1f} m, {F_modelo[1]:.0f} $/d)")
+    if n_marcas:
+        ax.scatter(F_geo[:n_marcas, 0], F_geo[:n_marcas, 1], s=60, color=_ORO, edgecolor="k", zorder=4, label=f"las geologías 0 a {n_marcas - 1} de la tabla")
+    if promedio:
+        ax.plot(prom[0], prom[1], "D", ms=11, mfc="#2e9b4f", mec="k", label=f"el promedio, f_eff(x): ({prom[0]:.1f} m, {prom[1]:.0f} $/d)")
+    ax.set_xlabel(ejes[0]); ax.set_ylabel(ejes[1].replace("$", r"\$")); ax.legend(fontsize=9, loc="upper left")
+    ax.set_title(titulo or "Una decisión, todas las geologías: su promedio es la función efectiva"); fig.tight_layout(); plt.show()
 
 
 def decision_en_geologias(s_geologias, s_prometido, r_acum, error, limite=3.0, nombre="pozo 1"):
@@ -1326,6 +1642,208 @@ def valor_prueba(agua_post, z_prior, titulo="El valor de una prueba de bombeo"):
     ax.axvline(z_prior, color=_AZUL, lw=2.5, label=f"sin la prueba: {z_prior:.0f} m³/d")
     ax.axvline(agua_post.mean(), color=_ORO, lw=2.5, ls="--", label=f"con la prueba, en promedio: {agua_post.mean():.0f} m³/d")
     ax.set_xlabel("agua que se decide bombear [m³/d]"); ax.set_ylabel("casos"); ax.legend(fontsize=9); ax.set_title(titulo); fig.tight_layout(); plt.show()
+
+
+# ============================================================== objetivo único (Sesión 4, secciones 2.1 y 3.1)
+def funcion_efectiva_unica(valores, f_hom, nombre="la decisión de la sesión 1", xl="f(p, X): agua menos multa [m³/d]"):
+    """Objetivo único: los valores de f de una decisión en cada geología (histograma), lo que prometía el homogéneo y su promedio (la función efectiva).
+    Derecha: el promedio con las primeras N geologías."""
+    import matplotlib.pyplot as plt
+    v = np.asarray(valores, dtype=float); N = np.arange(1, len(v) + 1); prom = v.mean()
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(14, 4.4), gridspec_kw=dict(width_ratios=[1.3, 1]))
+    a1.hist(v, bins=30, color="#2E7DB5", edgecolor="k", alpha=0.8, label=f"f en cada una de las {len(v)} geologías")
+    a1.axvline(f_hom, color=_ORO, lw=3, label=f"lo que prometía el homogéneo: {f_hom:,.0f}".replace(",", " "))
+    a1.axvline(prom, color=_VERDE, lw=3, ls="--", label=f"el promedio, f_eff: {prom:,.0f}".replace(",", " "))
+    a1.set_xlabel(xl); a1.set_ylabel("geologías"); a1.legend(fontsize=9, loc="upper left"); a1.set_title(f"{nombre}: un número por geología", fontsize=11)
+    a2.plot(N, np.cumsum(v) / N, color=_VERDE, lw=2.2); a2.axhline(f_hom, color=_ORO, lw=2)
+    a2.set_xlabel("número de geologías N"); a2.set_ylabel("promedio con las primeras N"); a2.set_title("La integral, paso a paso: sumar y dividir entre N", fontsize=11)
+    a2.grid(alpha=0.25); fig.tight_layout(); plt.show()
+
+
+def curva_efectiva(t, f_hom, f_eff, z, titulo="A lo largo de la decisión de la sesión 1: t × (370.87, 136.47, 300)"):
+    """Objetivo único: f con el homogéneo y la función efectiva a lo largo de una línea de decisiones (t veces una decisión); z = agua de cada una."""
+    import matplotlib.pyplot as plt
+    t = np.asarray(t); f_hom = np.asarray(f_hom); f_eff = np.asarray(f_eff)
+    fig, ax = plt.subplots(figsize=(9.5, 4.6))
+    ax.plot(t, f_hom, color=_ORO, lw=2.8, label="f con el homogéneo (un solo modelo)")
+    ax.plot(t, f_eff, color=_VERDE, lw=2.8, ls="--", label="f_eff: el promedio en las 200 geologías")
+    for f, col, txt, off in ((f_hom, _ORO, "óptimo con un modelo", (-175, -45)), (f_eff, _VERDE, "óptimo robusto", (12, 14))):
+        k = int(np.argmax(f)); ax.plot(t[k], f[k], "o", ms=12, color=col, mec="k", zorder=5)
+        ax.annotate(f"{txt}\nt = {t[k]:.2f}: {z[k]:.0f} m³/d", (t[k], f[k]), xytext=off, textcoords="offset points", fontsize=10, color=col, fontweight="bold")
+    lo = min(np.max(f_eff) - 1.2 * (np.max(f_hom) - np.min(f_eff[: len(t) // 2 + 1])), -200)
+    ax.set_ylim(max(lo, np.min(f_eff)), np.max(f_hom) * 1.25); ax.axhline(0, color="k", lw=0.6)
+    ax.set_xlabel("t (fracción de la decisión de la sesión 1)"); ax.set_ylabel("agua menos multa [m³/d]"); ax.legend(fontsize=9, loc="lower left")
+    ax.set_title(titulo, fontsize=11); ax.grid(alpha=0.25); fig.tight_layout(); plt.show()
+
+
+# ============================================================== OCA (Sesión 4, sección 5): zonas de protección y geologías representativas
+def zonas_proteccion(logK, semilla=10_000, verbose=True):
+    """La zona de protección (WHPA) de los tres pozos en cada geología, con el simulador del curso (rrwpt: flujo con elementos finitos y
+    caminata aleatoria inversa de partículas desde cada pozo; tiempo de tránsito de 30 días). Devuelve un arreglo (N, 91, 91): para cada
+    nodo, el porcentaje de partículas que lo cruzan en el tiempo de tránsito (≥ 50 %: el nodo está en la zona de esa geología).
+    Unos 0.45 s por geología la primera vez; se guarda en _cache_hidra/ (el nombre lleva una huella del ensamble)."""
+    import hashlib
+    import time
+    logK = np.asarray(logK); n = len(logK)
+    huella = hashlib.md5(np.ascontiguousarray(logK[: min(n, 3)]).tobytes()).hexdigest()[:10]
+    carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_cache_hidra")
+    ruta = os.path.join(carpeta, f"zonas_{huella}_{n}.npz")
+    if os.path.exists(ruta):
+        return np.load(ruta)["zonas"]
+    e = _preparar(); grid = e["grid"]
+    d = grid.data.d_pts; npt = tuple(int(v) for v in grid.data.n_pts)
+    yy, xx = np.meshgrid(np.arange(npt[0]) * d[0], np.arange(npt[1]) * d[1], indexing="ij")
+    junto_pozo = np.zeros(npt, dtype=bool)
+    for x, y in pozos_xy():                                         # el pozo capta siempre su entorno inmediato (las partículas nacen a su alrededor)
+        junto_pozo |= (xx - x) ** 2 + (yy - y) ** 2 <= 75.0 ** 2
+    zonas = np.zeros((n,) + npt, dtype=np.uint8); t0 = time.time()
+    if verbose:
+        print(f"Delineando la zona de protección en {n} geologías con el simulador (unos {0.45 * n:.0f} s la primera vez)…", flush=True)
+    for k in range(n):
+        yk = np.asarray(logK[k], dtype=float).reshape(-1, order="F")
+        r = _pipeline.run_realization(e["ctrl"], grid, e["model"], e["flowpar"], rng=np.random.default_rng(semilla + k), verbose=False, yk=yk)
+        m = np.asarray(_pipeline.prob_map_2d(r, grid), dtype=float); m[junto_pozo] = 100.0
+        zonas[k] = np.round(m).astype(np.uint8)
+        if verbose and (k + 1) % 50 == 0:
+            print(f"  geología {k + 1} de {n} ({time.time() - t0:.0f} s)", flush=True)
+    os.makedirs(carpeta, exist_ok=True); np.savez_compressed(ruta, zonas=zonas)
+    return zonas
+
+
+def _ejes_mapa(ax, titulo=None):
+    for x, y in pozos_xy():
+        ax.plot(x, y, "^", ms=10, color="#D9534F", mec="k")
+    ax.set_xlim(0, LADO); ax.set_ylim(0, LADO); ax.set_aspect("equal"); ax.set_xlabel("x [m]"); ax.set_ylabel("y [m]")
+    if titulo:
+        ax.set_title(titulo, fontsize=11)
+
+
+def zona_una_geologia(logK_k, zona_k, k=0):
+    """Una geología y su zona de protección: el campo de ln K con los pozos, y la zona (nodos con ≥ 50 % de las partículas) encima."""
+    import matplotlib.pyplot as plt
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(13, 5.6))
+    im = a1.imshow(logK_k, origin="lower", extent=[0, LADO, 0, LADO], cmap="viridis", vmin=-8.5, vmax=-4.5)
+    fig.colorbar(im, ax=a1, shrink=0.8, label="ln K"); _ejes_mapa(a1, f"Geología {k}: el campo de ln K y los tres pozos")
+    a2.imshow(logK_k, origin="lower", extent=[0, LADO, 0, LADO], cmap="Greys", vmin=-9.5, vmax=-3.5, alpha=0.55)
+    dentro = np.ma.masked_where(zona_k < 50, np.ones_like(zona_k, dtype=float))
+    a2.imshow(dentro, origin="lower", extent=[0, LADO, 0, LADO], cmap="autumn", alpha=0.65, vmin=0, vmax=1)
+    xs = np.linspace(0, LADO, zona_k.shape[1]); a2.contour(xs, xs, zona_k, levels=[50], colors="#B03A2E", linewidths=1.8)
+    _ejes_mapa(a2, f"Su zona de protección (30 días): {np.sum(zona_k >= 50) * 225 / 1e6:.2f} km²")
+    fig.tight_layout(); plt.show()
+
+
+def mapa_probabilidad_zonas(P, niveles=(0.1, 0.5, 0.9), P_sub=None, nombre_sub="subconjunto", errores=None):
+    """El mapa de probabilidad de captura del ensamble (P: un valor por nodo) con sus isolíneas. Con P_sub, a la derecha se comparan las
+    isolíneas del ensamble (negras) con las del subconjunto (rojas a trazos) y, si se dan, los errores de cada isolínea."""
+    import matplotlib.pyplot as plt
+    P = np.asarray(P).reshape(N_CELDAS + 1, N_CELDAS + 1); xs = np.linspace(0, LADO, P.shape[1])
+    colores = ("#F2F2F2", "#F0AD4E", "#D9534F")
+    fig, axs = plt.subplots(1, 2 if P_sub is not None else 1, figsize=(13 if P_sub is not None else 7, 5.6), squeeze=False)
+    a = axs[0, 0]; im = a.imshow(100 * P, origin="lower", extent=[0, LADO, 0, LADO], cmap="Blues", vmin=0, vmax=100)
+    fig.colorbar(im, ax=a, shrink=0.8, label="probabilidad de captura [%]")
+    cs = a.contour(xs, xs, P, levels=list(niveles), colors=["#1B2B33", "#C08A0B", "#B03A2E"], linewidths=1.8)
+    a.clabel(cs, fmt=lambda v: f"{100 * v:.0f} %", fontsize=9); _ejes_mapa(a, "Todas las geologías: la probabilidad de captura y sus isolíneas")
+    if P_sub is not None:
+        b = axs[0, 1]; Ps = np.asarray(P_sub).reshape(P.shape)
+        b.contour(xs, xs, P, levels=list(niveles), colors="k", linewidths=1.8)
+        b.contour(xs, xs, Ps, levels=list(niveles), colors="#D9534F", linewidths=1.6, linestyles="--")
+        b.plot([], [], "k-", label="todas las geologías"); b.plot([], [], "--", color="#D9534F", label=nombre_sub)
+        if errores is not None:
+            for t, e in zip(niveles, errores):
+                b.plot([], [], " ", label=f"isolínea {100 * t:.0f} %: {e:.0%} mal")
+        b.legend(fontsize=9, loc="lower right"); _ejes_mapa(b, f"Isolíneas: todas contra {nombre_sub}")
+    fig.tight_layout(); plt.show()
+
+
+def mapa_cumplir(DEC, P, niveles=(1.0, 0.9, 0.8), cortes=(0, 60, 120), P_sub=None, nombre_sub="subconjunto"):
+    """El «mapa» de Fritz: la probabilidad de que cada decisión de referencia cumpla todas las reglas, en tres cortes del pozo 3, con las
+    isolíneas de 100, 90 y 80 % (riesgo 0, 10 y 20 %). Con P_sub, las isolíneas del subconjunto encima, a trazos."""
+    import matplotlib.pyplot as plt
+    DEC = np.asarray(DEC); P = np.asarray(P); g1 = np.unique(DEC[:, 0]); g2 = np.unique(DEC[:, 1])
+    fig, axs = plt.subplots(1, len(cortes), figsize=(5 * len(cortes), 4.6))
+    colores = ["#1F6FB2", "#C08A0B", "#B03A2E"]
+    def rejilla(sel, valores):
+        M = np.full((len(g2), len(g1)), np.nan)
+        for (p1, p2), v in zip(DEC[sel, :2], valores[sel]):
+            M[np.searchsorted(g2, p2), np.searchsorted(g1, p1)] = v
+        return M
+    for a, p3 in zip(np.atleast_1d(axs), cortes):
+        sel = DEC[:, 2] == p3; M = rejilla(sel, P)
+        d1, d2 = (g1[1] - g1[0]) / 2, (g2[1] - g2[0]) / 2
+        im = a.imshow(100 * M, origin="lower", extent=[g1[0] - d1, g1[-1] + d1, g2[0] - d2, g2[-1] + d2], cmap="Greens", vmin=0, vmax=100, aspect="auto", alpha=0.7)
+        a.contour(g1, g2, M, levels=sorted(t - 1e-6 for t in niveles), colors=colores[::-1][: len(niveles)], linewidths=2.2)
+        if P_sub is not None:
+            a.contour(g1, g2, rejilla(sel, np.asarray(P_sub)), levels=sorted(t - 1e-6 for t in niveles), colors=colores[::-1][: len(niveles)],
+                      linewidths=1.6, linestyles="--")
+        a.set_xlabel("bombeo del pozo 1 [m³/d]"); a.set_ylabel("bombeo del pozo 2 [m³/d]"); a.set_title(f"pozo 3 = {p3:g} m³/d", fontsize=11)
+    for t, c in zip(niveles, colores):
+        axs[-1].plot([], [], "-", color=c, lw=2, label=f"cumple en {100 * t:.0f} % (riesgo {100 * (1 - t):.0f} %)")
+    if P_sub is not None:
+        axs[-1].plot([], [], "k--", label=nombre_sub)
+    axs[-1].legend(fontsize=8.5, loc="upper right")
+    fig.subplots_adjust(wspace=0.32); fig.colorbar(im, ax=axs, shrink=0.85, label="probabilidad de cumplir todas las reglas [%]"); plt.show()
+
+
+def espacio_rasgos(RAS, elegidas=None, ejemplos=(), nombres=("distancia del campo de K al medio", "«área» de la zona", "distancia de la zona a la media"),
+                   titulo="Cada geología es un punto en el espacio de tres rasgos"):
+    """Las geologías como puntos en el espacio de tres rasgos (normalizados entre 0 y 1); en rojo, las elegidas; en oro, algunos ejemplos."""
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(13, 5.2)); RAS = np.asarray(RAS)
+    a = fig.add_subplot(1, 2, 1, projection="3d")
+    a.scatter(*RAS.T, s=14, color="#7C8B99", alpha=0.55, label=f"las {len(RAS)} geologías")
+    if elegidas is not None:
+        a.scatter(*RAS[elegidas].T, s=70, color="#D9534F", edgecolor="k", label=f"las {len(elegidas)} elegidas", depthshade=False)
+    for k in ejemplos:
+        a.scatter(*RAS[k], s=110, color="#C08A0B", edgecolor="k", depthshade=False); a.text(*RAS[k], f"  {k}", fontsize=9)
+    a.set_xlabel(nombres[0], fontsize=8); a.set_ylabel(nombres[1], fontsize=8); a.set_zlabel(nombres[2], fontsize=8)
+    a.legend(fontsize=8, loc="upper left"); a.set_title(titulo, fontsize=10.5)
+    b = fig.add_subplot(1, 2, 2)
+    b.scatter(RAS[:, 1], RAS[:, 2], s=14, color="#7C8B99", alpha=0.6)
+    if elegidas is not None:
+        b.scatter(RAS[elegidas, 1], RAS[elegidas, 2], s=70, color="#D9534F", edgecolor="k")
+    for k in ejemplos:
+        b.scatter(RAS[k, 1], RAS[k, 2], s=110, color="#C08A0B", edgecolor="k"); b.annotate(f" geología {k}", RAS[k, 1:], fontsize=9)
+    b.set_xlabel(nombres[1]); b.set_ylabel(nombres[2]); b.set_title("Visto desde un lado: los dos rasgos de la zona", fontsize=10.5); b.grid(alpha=0.25)
+    fig.tight_layout(); plt.show()
+
+
+def oca_contra_azar(err_azar, err_oca, tam, niveles_txt=("100 %", "90 %", "80 %"), err_primeras=None, titulo="¿Qué tan bien reproduce cada subconjunto las isolíneas?"):
+    """El error de cada isolínea (fracción de su tamaño) para muchos subconjuntos al azar (histograma), la OCA (línea roja) y, si se da, las primeras K."""
+    import matplotlib.pyplot as plt
+    err_azar = np.asarray(err_azar) / np.asarray(tam); err_oca = np.asarray(err_oca) / np.asarray(tam)
+    fig, axs = plt.subplots(1, len(tam), figsize=(4.6 * len(tam), 3.9))
+    for j, a in enumerate(axs):
+        a.hist(100 * err_azar[:, j], bins=20, color="#AEB9C4", edgecolor="k", lw=0.4, label=f"{len(err_azar)} subconjuntos al azar")
+        a.axvline(100 * err_oca[j], color="#D9534F", lw=3, label=f"OCA: {err_oca[j]:.0%}")
+        if err_primeras is not None:
+            a.axvline(100 * err_primeras[j] / tam[j], color="#1B2B33", lw=1.8, ls="--", label=f"las primeras: {err_primeras[j] / tam[j]:.0%}")
+        mejor = np.mean(err_azar[:, j] < err_oca[j])
+        a.set_title(f"isolínea {niveles_txt[j]} · el azar le gana {mejor:.0%} de las veces", fontsize=10)
+        a.set_xlabel("mal clasificadas [% de la isolínea]"); a.set_ylabel("subconjuntos"); a.legend(fontsize=8.5)
+    fig.suptitle(titulo, fontsize=12); fig.tight_layout(); plt.show()
+
+
+def oca_validacion(filas, niveles=(0.0, 0.10, 0.20)):
+    """Lo que se pide y lo que se obtiene: el riesgo REAL (en geologías nuevas) de la decisión elegida con cada conjunto, para cada riesgo pedido.
+    filas: [(nombre, (agua por nivel), (riesgo real por nivel), color)]."""
+    import matplotlib.pyplot as plt
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(14, 4.6)); x = np.arange(len(niveles)); w = 0.8 / len(filas)
+    for j, (nombre, agua, real, color) in enumerate(filas):
+        xx = x + (j - (len(filas) - 1) / 2) * w
+        a1.bar(xx, 100 * np.asarray(real), w, color=color, edgecolor="k", lw=0.4, label=nombre)
+        a2.bar(xx, agua, w, color=color, edgecolor="k", lw=0.4, label=nombre)
+        for xi, v in zip(xx, real):
+            a1.text(xi, 100 * v + 0.6, f"{100 * v:.0f}", ha="center", fontsize=8)
+        for xi, v in zip(xx, agua):
+            a2.text(xi, v + 4, f"{v:.0f}", ha="center", fontsize=8)
+    for xi, r in zip(x, niveles):
+        a1.plot([xi - 0.45, xi + 0.45], [100 * r] * 2, ":", color="#B03A2E", lw=2)
+    a1.plot([], [], ":", color="#B03A2E", lw=2, label="lo que se pidió")
+    for a in (a1, a2):
+        a.set_xticks(x); a.set_xticklabels([f"se pide riesgo ≤ {100 * r:.0f} %" for r in niveles]); a.grid(axis="y", alpha=0.25)
+    a1.set_ylabel("riesgo REAL en 200 geologías nuevas [%]"); a1.set_title("¿Cumple la decisión lo que promete?"); a1.legend(fontsize=8.5)
+    a2.set_ylabel("agua de la decisión elegida [m³/d]"); a2.set_title("¿Cuánta agua se decide bombear?")
+    fig.tight_layout(); plt.show()
 
 
 def datos_tarea(identificador):
