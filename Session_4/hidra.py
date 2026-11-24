@@ -56,6 +56,12 @@ except ImportError:  # pragma: no cover
         sys.path[:] = [p for p in sys.path if p not in _antes] + _antes
         print(f"Aviso: este cuaderno corre con {sys.executable}, no con el .venv del curso.\n"
               "hidra usará los paquetes del .venv. Para quitar este aviso, elige el kernel .venv (arriba a la derecha).")
+    # >>> respaldo de la máquina del instructor (el empaquetador lo quita)
+    for _cand in (os.path.join(_aqui, "..", "Información", "Versiones_anteriores", "Curso_V2"), os.path.join(_aqui, "..", "Curso_V2")):
+        if os.path.isdir(os.path.join(_cand, "rrwpt")):
+            sys.path.insert(0, os.path.abspath(_cand))
+            break
+    # <<< respaldo de la máquina del instructor
     try:
         import rrwpt  # noqa: F401
     except ImportError:
@@ -1307,6 +1313,54 @@ def decision_en_ensamble(S, Hh, s_hom, h_hom, n=8, s_max=3.0, s_hum=1.25):
     fig.tight_layout(); plt.show()
 
 
+def tres_promedios(X, limite=3.0, unidad="m"):
+    """La misma operación, el promedio, con tres h distintas (2026-11-23, ARP: «una visualización de esta celda»). Tres paneles, una barra por geología:
+    h(X) = X (su promedio es la media), h(X) = (X − media)² (la varianza) y h(X) = 1 si X > límite (la probabilidad). La raya horizontal es el promedio de
+    las barras de cada panel."""
+    import matplotlib.pyplot as plt
+    X = np.asarray(X, float); n = len(X); k = np.arange(n); m = X.mean(); v = (X - m) ** 2; ind = (X > limite).astype(float)
+    fig, axs = plt.subplots(1, 3, figsize=(16, 4.4))
+    a1, a2, a3 = axs
+    a1.bar(k, X, 1.0, color=_AZUL, alpha=0.75); a1.axhline(m, color=_ORO, lw=2.5)
+    caja = dict(fc="white", ec=_ORO, alpha=0.92, boxstyle="round,pad=0.3")
+    a1.text(0.97, 0.95, f"media = {m:.2f} {unidad}", transform=a1.transAxes, color=_ORO, fontsize=12, fontweight="bold", ha="right", va="top", bbox=caja)
+    a1.set_title("h(X) = X  →  la media", fontsize=13); a1.set_ylabel(f"h(X) [{unidad}]")
+    a2.bar(k, v, 1.0, color=_GRIS, alpha=0.75); a2.axhline(v.mean(), color=_ORO, lw=2.5)
+    a2.text(0.97, 0.95, f"varianza = {v.mean():.2f} {unidad}²\n(σ = {np.sqrt(v.mean()):.2f} {unidad})", transform=a2.transAxes, color=_ORO, fontsize=12, fontweight="bold", ha="right", va="top", bbox=caja)
+    a2.set_title("h(X) = (X − media)²  →  la varianza", fontsize=13); a2.set_ylabel(f"h(X) [{unidad}²]")
+    a3.bar(k, np.where(ind > 0, 1.0, 0.06), 1.0, color=[_ROJO if i else _VERDE for i in ind], alpha=0.85); a3.axhline(ind.mean(), color=_ORO, lw=2.5)
+    a3.text(0.97, 0.97, f"P(X > {limite:g}) = {ind.mean():.2f}", transform=a3.transAxes, color=_ORO, fontsize=12, fontweight="bold", ha="right", va="top", bbox=caja)
+    a3.text(0.02, 0.97, "rojo = 1 (pasa)   verde = 0 (no pasa)", transform=a3.transAxes, fontsize=10, color=_GRIS, va="top")
+    a3.set_title(f"h(X) = 1 si X > {limite:g} {unidad}, 0 si no  →  la probabilidad", fontsize=13); a3.set_ylim(0, 1.35); a3.set_yticks([0, 1])
+    for ax in axs:
+        ax.set_xlabel("geología (una barra por geología)"); ax.set_xlim(-1, n)
+        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    fig.suptitle("La misma operación en los tres: el promedio de las barras (la raya dorada). Solo cambia h.", fontsize=13, y=1.02)
+    fig.tight_layout(); plt.show()
+
+
+def resumen_variable(X, limite=3.0, prometido=3.0, unidad="m"):
+    """La celda de media, varianza y P(X > límite) en una sola figura (2026-11-23, ARP: «como el histograma del video de la lámina 12»): el histograma de X
+    (una barra cada medio metro), la media con su ± σ, y las barras que pasan del límite en otro color con la probabilidad escrita."""
+    import matplotlib.pyplot as plt
+    X = np.asarray(X, float); m = X.mean(); sd = X.std(); p = np.mean(X > limite)
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    bins = np.arange(0, np.ceil(X.max()) + 0.5, 0.5)
+    n_, b_, parches = ax.hist(X, bins=bins, color="#5B9BFF", edgecolor="white")
+    for pa, izq in zip(parches, b_[:-1]):
+        if izq >= limite: pa.set_facecolor("#E8A09A")
+    top = max(n_) * 1.18; ax.set_ylim(0, top)
+    ax.annotate("", (m - sd, top * 0.74), (m + sd, top * 0.74), arrowprops=dict(arrowstyle="<->", color=_ORO, lw=2))
+    ax.text(m + sd + 0.2, top * 0.74, f"media ± σ  (σ = {sd:.2f} {unidad}; varianza {sd ** 2:.2f} {unidad}²)", color=_ORO, va="center", fontsize=11, fontweight="bold")
+    ax.axvline(m, color=_ROJO, lw=2.8); ax.text(m + 0.15, top * 0.93, f"media = {m:.2f} {unidad}", color=_ROJO, fontsize=13, fontweight="bold")
+    ax.axvline(limite, color="k", ls="--", lw=1.6)
+    ax.text(0.0, top * 0.97, f"punteada: {prometido:.2f} {unidad}\n(un solo modelo\ny el límite)", color="k", fontsize=10, ha="left", va="top")
+    ax.text(X.max(), top * 0.45, f"en rojo, las que pasan de {limite:g} {unidad}:\nP(X > {limite:g}) = {p:.2f}", color=_ROJO, fontsize=12, fontweight="bold", ha="right")
+    ax.set_xlabel(f"abatimiento del pozo 1 [{unidad}] (una barra por cada medio metro)"); ax.set_ylabel("geologías")
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    fig.tight_layout(); plt.show()
+
+
 def variable_aleatoria(X, nombre="abatimiento del pozo 1 [m]", limite=None, semilla=0):
     """Introducción básica a una variable aleatoria, en dos paneles. Izquierda: un dado lanzado 12, 120 y 12 000 veces; la frecuencia de cada cara se acerca a 1/6
     (su distribución). Derecha: X, una variable aleatoria del acuífero (un valor por geología): su histograma es una estimación de su distribución p(x)."""
@@ -1361,18 +1415,39 @@ def decision_en_matrices(casos, s_max=3.0, s_hum=1.25):
     fig.tight_layout(); plt.show()
 
 
-def bombeos_frente(X, indice, titulo="Qué decisiones hay en el frente"):
+def bombeos_frente(X, indice, titulo="Qué decisiones hay en el frente", S=None, Sh=None, s_max=3.0, s_hum=1.25,
+                   titulo_abajo="Cuánto baja cada pozo y el humedal con esas decisiones (modelo homogéneo)"):
     """Las decisiones de un frente ordenadas por el índice de necesidad: cuánto bombea cada pozo (barras apiladas) y el índice (línea).
-    A la izquierda, poco bombeo e índice alto; a la derecha, mucho bombeo e índice bajo."""
+    A la izquierda, poco bombeo e índice alto; a la derecha, mucho bombeo e índice bajo. Si se dan S (n x 3, abatimiento de cada pozo) y Sh (n, el del
+    humedal), un segundo panel debajo, con las decisiones en el mismo orden, dibuja cuánto baja cada pozo y el humedal, con sus límites (2026-11-23, ARP)."""
     import matplotlib.pyplot as plt
     X = np.asarray(X); indice = np.asarray(indice); o = np.argsort(-indice); Xo = X[o]
-    fig, ax = plt.subplots(figsize=(13, 4.4)); x = np.arange(len(Xo)); base = np.zeros(len(Xo))
+    if S is None:
+        fig, ax = plt.subplots(figsize=(13, 4.4))
+    else:
+        fig, (ax, ab) = plt.subplots(2, 1, figsize=(13, 7.6), sharex=True, gridspec_kw=dict(height_ratios=[1.15, 1]))
+    x = np.arange(len(Xo)); base = np.zeros(len(Xo))
     for j, c in enumerate((_AZUL, _ORO, _VERDE)):
         ax.bar(x, Xo[:, j], 1.0, bottom=base, color=c, label=f"pozo {j + 1}"); base += Xo[:, j]
-    ax.set_xlabel(f"las {len(Xo)} decisiones, de la que menos bombea a la que más (ordenadas por el índice)"); ax.set_ylabel("bombeo [m³/d]")
+    ax.set_ylabel("bombeo [m³/d]")
     a2 = ax.twinx(); a2.plot(x, indice[o], color="k", lw=2, label="índice de necesidad"); a2.set_ylabel("índice de necesidad")
     h1, l1 = ax.get_legend_handles_labels(); h2, l2 = a2.get_legend_handles_labels(); ax.legend(h1 + h2, l1 + l2, loc="upper center", fontsize=9, ncol=4)
-    ax.set_title(titulo, fontsize=12); fig.tight_layout(); plt.show()
+    ax.set_title(titulo, fontsize=12)
+    eje_x = f"las {len(Xo)} decisiones, de la que menos bombea a la que más (ordenadas por el índice)"
+    if S is None:
+        ax.set_xlabel(eje_x)
+    else:
+        S = np.asarray(S)[o]
+        for j, c in enumerate((_AZUL, _ORO, _VERDE)):
+            ab.plot(x, S[:, j], color=c, lw=1.6, label=f"pozo {j + 1}")
+        ab.axhline(s_max, color=_ROJO, ls="--", lw=2); ab.text(len(Xo) * 0.995, s_max + 0.05, f"límite de los pozos: {s_max:g} m", color=_ROJO, fontsize=10, va="bottom", ha="right")
+        if Sh is not None:
+            ab.plot(x, np.asarray(Sh)[o], color="k", lw=1.6, ls=":", label="humedal")
+            ab.axhline(s_hum, color="k", ls="--", lw=1.2); ab.text(len(Xo) * 0.005, s_hum + 0.05, f"límite del humedal: {s_hum:g} m", color="k", fontsize=10, va="bottom")
+        ab.set_ylim(0, max(s_max, float(S.max())) * 1.12)
+        ab.set_ylabel("cuánto baja [m]"); ab.set_xlabel(eje_x); ab.legend(loc="upper left", fontsize=9, ncol=4)
+        ab.set_title(titulo_abajo, fontsize=11)
+    fig.tight_layout(); plt.show()
 
 
 def receta_propagacion(logK, A, H, p, n_mapas=3, s_max=3.0, s_hum=1.25):
@@ -1523,9 +1598,10 @@ def histograma_riesgo(riesgos, riesgo_max=None, titulo="¿Qué tan seguido falla
     ax.set_xlabel(xl); ax.set_ylabel("decisiones"); ax.legend(fontsize=9); ax.set_title(titulo); fig.tight_layout(); plt.show()
 
 
-def promedio_contra_riesgo(frentes, marca=None, s_max=3.0):
+def promedio_contra_riesgo(frentes, marca=None, s_max=3.0, ejemplos=()):
     """Cumplir en promedio no es cumplir: cada decisión como un punto, con el abatimiento promedio del pozo más exigido (eje x) y su riesgo (eje y).
-    frentes: {nombre: (promedios, riesgos, color)}; marca: (promedio, riesgo, texto) de una decisión a señalar."""
+    frentes: {nombre: (promedios, riesgos, color)}; marca: (promedio, riesgo, texto) de una decisión a señalar;
+    ejemplos: [(promedio, riesgo, texto, color, (dx, dy))] puntos de ejemplo con un círculo y su rótulo (dx, dy: corrimiento del rótulo, en m y %)."""
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(9.5, 5.2))
     xmax = max(float(np.max(v[0])) for v in frentes.values()) * 1.05 + 0.3
@@ -1537,6 +1613,10 @@ def promedio_contra_riesgo(frentes, marca=None, s_max=3.0):
         ax.plot(marca[0], 100 * marca[1], "*", ms=22, color=_ORO, mec="k", zorder=5)
         ax.annotate(f"{marca[2]}:\ncumple en promedio\ny rompe en {marca[1]:.0%}", (marca[0], 100 * marca[1]), xytext=(marca[0] + 5.0, 100 * marca[1] - 30),
                     fontsize=10.5, color=_ORO, fontweight="bold", bbox=dict(fc="white", ec=_ORO), arrowprops=dict(arrowstyle="->", color=_ORO, lw=1.5))
+    for x, r, texto, color, (dx, dy) in ejemplos:
+        ax.plot(x, 100 * r, "o", ms=16, mfc="none", mec=color, mew=2.5, zorder=6)
+        ax.annotate(texto, (x, 100 * r), xytext=(x + dx, 100 * r + dy), fontsize=9.5, color=color, fontweight="bold",
+                    bbox=dict(fc="white", ec=color), arrowprops=dict(arrowstyle="->", color=color, lw=1.5), zorder=7)
     ax.set_xlim(0, xmax); ax.set_ylim(-3, 103)
     ax.set_xlabel("abatimiento promedio del pozo más exigido [m]"); ax.set_ylabel("riesgo: geologías en que rompe [%]")
     ax.legend(fontsize=9, loc="lower right"); ax.set_title("El promedio contra el riesgo: cada punto es una decisión")
@@ -1658,6 +1738,79 @@ def funcion_efectiva_unica(valores, f_hom, nombre="la decisión de la sesión 1"
     a2.plot(N, np.cumsum(v) / N, color=_VERDE, lw=2.2); a2.axhline(f_hom, color=_ORO, lw=2)
     a2.set_xlabel("número de geologías N"); a2.set_ylabel("promedio con las primeras N"); a2.set_title("La integral, paso a paso: sumar y dividir entre N", fontsize=11)
     a2.grid(alpha=0.25); fig.tight_layout(); plt.show()
+
+
+def cubo_decisiones(f, A, H, p_s1, p_linea, p_enjambre, paso=20, pmax=400, alto=620):
+    """«La cima se mueve», en 3-D (2026-11-23, ARP): el cubo de las decisiones (bombeo de los tres pozos, de 0 a pmax cada paso m³/d), interactivo (plotly).
+    Cada punto es una decisión calificada con el promedio en las geologías, f(p, A, H).mean(); en color las que califican ≥ 0 y en gris tenue las que pagan
+    más multa que agua. Encima: la línea (la decisión de la sesión 1 escalada de 0 a 1.1), la de la sesión 1, la mejor de la línea y la del enjambre."""
+    try:
+        import plotly.graph_objects as go
+        import plotly.io as pio
+    except ImportError as e:
+        raise ImportError("Falta plotly (la figura 3-D interactiva):  pip install -r requirements.txt") from e
+    if "google.colab" not in sys.modules:
+        pio.renderers.default = "plotly_mimetype"
+    g = np.arange(0, pmax + 1e-9, paso)
+    P = np.array(np.meshgrid(g, g, g, indexing="ij")).reshape(3, -1).T          # todas las decisiones de la malla
+    fe = np.array([f(p, A, H).mean() for p in P])                               # su calificación promedio
+    k = int(np.argmax(fe))
+    print(f"{len(P)} decisiones en la malla; la mejor: {np.round(P[k]).astype(int)} = {P[k].sum():.0f} m³/d, calificación {fe[k]:.0f}")
+    print(f"califican ≥ 0 (dan más agua que multa): {np.sum(fe >= 0)} de {len(P)}")
+    buenas = fe >= 0
+    fig = go.Figure()
+    fig.add_trace(go.Scatter3d(x=P[~buenas, 0], y=P[~buenas, 1], z=P[~buenas, 2], mode="markers", name="pagan más multa que agua",
+                               marker=dict(size=2, color="#9aa5b1", opacity=0.25), hoverinfo="skip"))
+    fig.add_trace(go.Scatter3d(x=P[buenas, 0], y=P[buenas, 1], z=P[buenas, 2], mode="markers", name="califican ≥ 0",
+                               marker=dict(size=4, color=fe[buenas], colorscale="Viridis", colorbar=dict(title="calificación<br>promedio"), opacity=0.85),
+                               text=[f"({a:.0f}, {b:.0f}, {c:.0f}) → {v:.0f}" for (a, b, c), v in zip(P[buenas], fe[buenas])], hoverinfo="text"))
+    lin = np.outer([0, 1.1], np.asarray(p_s1, float))
+    fig.add_trace(go.Scatter3d(x=lin[:, 0], y=lin[:, 1], z=lin[:, 2], mode="lines", name="la línea: la sesión 1 escalada", line=dict(color="black", width=5)))
+    def esq(p): return "(" + ", ".join(f"{v:.0f}" for v in np.asarray(p, float)) + ")"
+    for p, nombre, corto, col, sim in ((p_s1, f"sesión 1: {esq(p_s1)} = {np.sum(p_s1):.0f} m³/d (un solo modelo)", "sesión 1", "goldenrod", "diamond"),
+                                       (p_linea, f"mejor de la línea: {esq(p_linea)} = {np.sum(p_linea):.0f} m³/d (mismo reparto)", "mejor de la línea", "green", "circle"),
+                                       (p_enjambre, f"enjambre (3.1): {esq(p_enjambre)} = {np.sum(p_enjambre):.0f} m³/d (pozo 2 apagado)", "enjambre", "red", "diamond")):
+        p = np.asarray(p, float)
+        fig.add_trace(go.Scatter3d(x=[p[0]], y=[p[1]], z=[p[2]], mode="markers", name=nombre, hovertext=[f"{corto} {esq(p)}"], hoverinfo="text",
+                                   marker=dict(size=9, color=col, symbol=sim, line=dict(color="black", width=2))))
+    fig.update_layout(title="El cubo de las decisiones, calificadas con el promedio en 200 geologías · gíralo con el mouse", height=alto,
+                      margin=dict(l=0, r=0, t=40, b=0), legend=dict(x=0, y=1, font=dict(size=13)),
+                      scene=dict(xaxis_title="pozo 1 [m³/d]", yaxis_title="pozo 2 [m³/d]", zaxis_title="pozo 3 [m³/d]",
+                                 camera=dict(eye=dict(x=-1.55, y=-1.75, z=0.95))))
+    fig.show()
+
+
+def cima_se_mueve(z, f_hom, f_eff, linea=None, ymin=-1000):
+    """«La cima se mueve» (2026-11-23, ARP): solo dibuja. z = agua de cada decisión de la línea; f_hom = su calificación con un solo modelo; f_eff = su promedio
+    en las geologías. Eje vertical recortado en ymin; donde f_eff se sale, una flecha dice cuánto vale en el máximo de un solo modelo."""
+    import matplotlib.pyplot as plt
+    z, f_hom, f_eff = np.asarray(z, float), np.asarray(f_hom, float), np.asarray(f_eff, float)
+    kh, ke = int(np.argmax(f_hom)), int(np.argmax(f_eff))
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    ax.plot(z, f_hom, color=_ORO, lw=3, label="un solo modelo (el homogéneo)")
+    dentro = f_eff >= ymin                                       # la parte que cabe; lo demás lo dice la flecha
+    ax.plot(z[dentro], f_eff[dentro], color=_VERDE, lw=3, ls="--", label="el promedio en las 200 geologías (f_eff)")
+    def esquema(k):                                              # (p1, p2, p3) de la decisión k, si se dio la línea
+        return "" if linea is None else "\n(" + ", ".join(f"{v:.0f}" for v in np.asarray(linea)[k]) + ") m³/d"
+    ax.plot(z[kh], f_hom[kh], "o", ms=13, color=_ORO, mec="k", zorder=5)
+    ax.annotate(f"un solo modelo:\nlo mejor es bombear {z[kh]:.0f} m³/d{esquema(kh)}", (z[kh], f_hom[kh]), xytext=(-20, 10), textcoords="offset points", ha="right",
+                fontsize=11, color=_ORO, fontweight="bold")
+    ax.plot(z[ke], f_eff[ke], "o", ms=13, color=_VERDE, mec="k", zorder=5)
+    ax.annotate(f"el promedio:\nlo mejor es bombear {z[ke]:.0f} m³/d{esquema(ke)}", (z[ke], f_eff[ke]), xytext=(10, 22), textcoords="offset points",
+                fontsize=11, color=_VERDE, fontweight="bold")
+    if linea is not None:                                        # el reparto, que es el mismo en toda la línea
+        r = np.asarray(linea)[-1] / np.asarray(linea)[-1].sum()
+        ax.text(0.68, 0.45, "en toda la línea, el mismo reparto:\n" + "\n".join(f"pozo {j + 1}: {100 * r[j]:.0f} %" for j in range(3)),
+                transform=ax.transAxes, ha="right", va="top", fontsize=10.5, bbox=dict(fc="white", ec="0.6", boxstyle="round,pad=0.4"))
+    ax.annotate(f"sigue bajando: en {z[kh]:.0f} m³/d\nel promedio vale {f_eff[kh]:,.0f}".replace(",", " "), (z[kh], ymin), xytext=(z[kh] - 330, ymin + 260),
+                fontsize=10.5, color=_VERDE, arrowprops=dict(arrowstyle="->", color=_VERDE, lw=1.5))
+    ax.set_ylim(ymin, max(f_hom) * 1.5); ax.axhline(0, color="k", lw=0.6)
+    ax.set_xlabel("agua bombeada [m³/d]  (la decisión de la sesión 1 escalada: menos agua a la izquierda)")
+    ax.set_ylabel("calificación: agua menos multa")
+    ax.set_title("La cima se mueve: con el promedio, a partir de unos cuantos m³/d la multa crece más rápido que el agua", fontsize=11.5)
+    ax.legend(fontsize=10, loc="upper left"); ax.grid(alpha=0.25)
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    fig.tight_layout(); plt.show()
 
 
 def curva_efectiva(t, f_hom, f_eff, z, titulo="A lo largo de la decisión de la sesión 1: t × (370.87, 136.47, 300)"):
