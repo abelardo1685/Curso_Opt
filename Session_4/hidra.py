@@ -1623,6 +1623,42 @@ def promedio_contra_riesgo(frentes, marca=None, s_max=3.0, ejemplos=()):
     fig.tight_layout(); plt.show()
 
 
+def rio_promedio(s_geo, falla, s_max=3.0):
+    """Cumplir en promedio no es cumplir, la misma figura de la lámina 22 de la S4 (laminas/figuras_conceptuales.py, ARP 2026-11-23).
+    Izquierda, el río de un metro de profundidad media con un canal de 3 m. Derecha, una decisión geología por geología.
+    s_geo: (N,) abatimiento del pozo más exigido en cada geología [m]; falla: (N,) True donde la decisión rompe alguna regla."""
+    import matplotlib.pyplot as plt
+    AZ, VE, CO, TI = "#0B5B72", "#2E9B4F", "#D9534F", "#1B2B33"
+    with plt.rc_context({"font.size": 13, "axes.edgecolor": TI, "axes.labelcolor": TI, "xtick.color": TI, "ytick.color": TI}):   # la letra de la lámina
+        s_geo = np.asarray(s_geo, dtype=float); falla = np.asarray(falla, dtype=bool)
+        fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.6), gridspec_kw=dict(width_ratios=[1.0, 1.05]))
+        x = np.linspace(0, 20, 400)
+        prof = 0.55 + 1.85 * np.exp(-((x - 12.5) / 1.6) ** 2); prof = prof * (1.0 / prof.mean())
+        a1.fill_between(x, 0, -prof, color="#9CC9DB"); a1.plot(x, -prof, color="#6B4F2A", lw=3); a1.axhline(0, color=AZ, lw=2)
+        a1.axhline(-prof.mean(), color=VE, ls="--", lw=2.5)
+        a1.text(0.3, -prof.mean() - 0.45, f"en promedio: {prof.mean():.0f} m  ✓", color=VE, fontsize=14, fontweight="bold")
+        a1.text(12.5, -prof.max() - 0.35, f"aquí: {prof.max():.0f} m  ✗", ha="center", color=CO, fontsize=14, fontweight="bold")
+        for xp in (3.0, 12.5):                                    # una persona de 1.6 m
+            y0 = -np.interp(xp, x, prof)
+            a1.plot([xp, xp], [y0, y0 + 1.25], color=TI, lw=3); a1.plot(xp, y0 + 1.45, "o", ms=11, color=TI)
+        a1.set_ylim(-3.4, 2.0); a1.set_xticks([]); a1.set_yticks([])
+        for sp in a1.spines.values(): sp.set_visible(False)
+        a1.set_title("Un río: «en promedio tiene un metro»", color=TI, fontsize=15, fontweight="bold")
+        bins = np.arange(0, min(s_geo.max(), 13) + 0.5, 0.5)
+        n_, b_, parches = a2.hist(s_geo, bins=bins, color=VE, edgecolor="white", lw=0.6)
+        for pa, izq in zip(parches, b_[:-1]):
+            if izq >= s_max: pa.set_facecolor(CO)
+        a2.axvline(s_max, color=TI, ls="--", lw=2); a2.text(s_max + 0.12, max(n_) * 1.12, f"límite {s_max:g} m", color=TI, fontsize=12, fontweight="bold")
+        a2.set_ylim(0, max(n_) * 1.25)
+        nc, nf = int((~falla).sum()), int(falla.sum())
+        a2.text(-0.4, max(n_) * 1.06, f"cumple\n{nc} de {len(falla)}", color=VE, fontsize=15, fontweight="bold", ha="left")
+        a2.text(8.0, max(n_) * 0.62, f"falla\n{nf} de {len(falla)} ({falla.mean():.0%})", color=CO, fontsize=15, fontweight="bold", ha="center")
+        a2.set_xlabel("abatimiento del pozo más exigido [m], una barra por cada medio metro", fontsize=11); a2.set_ylabel("geologías nuevas", fontsize=11)
+        a2.set_title("Fritz: en promedio, cada pozo cumple  ✓", color=TI, fontsize=15, fontweight="bold")
+        for sp in ("top", "right"): a2.spines[sp].set_visible(False)
+        fig.tight_layout(); plt.show()
+
+
 def nube_decision(F_geo, F_modelo, frente=None, verde=None, ejes=("Abatimiento total [m]", "Costo [$/d]"), titulo=None, promedio=True, n_marcas=0):
     """Robustez de tipo I con una decisión (lámina «Solución robusta de tipo I»): sus resultados en cada geología (la nube B(x)), lo que prometía un
     solo modelo y el promedio, sobre el plano de los dos primeros objetivos. F_geo: (N, ≥2); F_modelo: (≥2,); frente y verde: (n, ≥2) opcionales."""
@@ -1670,6 +1706,91 @@ def frente_agua_riesgo(FR, F_omo=None, referencia=None, demanda=1200.0, xmax=100
     ax.set_xlabel("bombeo total [m³/d]"); ax.set_ylabel("riesgo de incumplir"); ax.set_xlim(0, xmax); ax.legend()
     ax.set_title("Cuánta agua, con qué riesgo"); fig.tight_layout(); plt.show()
 
+
+
+def mosaico_fallas(casos, titulo="El riesgo, geología por geología"):
+    """Un mosaico de casillas por decisión: cada casilla es una geología, verde si la decisión cumple ahí y roja si rompe alguna regla.
+    casos: lista de (texto, fallas) con fallas = arreglo de True/False, uno por geología. El riesgo es la fracción de casillas rojas."""
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import ListedColormap
+    n = len(casos)
+    fig, ejes = plt.subplots(1, n, figsize=(4.6 * n, 3.4))
+    ejes = np.atleast_1d(ejes)
+    for ax, (texto, fallas) in zip(ejes, casos):
+        f = np.asarray(fallas, dtype=bool); cols = 20; filas = int(np.ceil(len(f) / cols))
+        M = np.full(filas * cols, np.nan); M[:len(f)] = f
+        ax.imshow(M.reshape(filas, cols), cmap=ListedColormap([_VERDE, _ROJO]), vmin=0, vmax=1)
+        ax.set_xticks(np.arange(-0.5, cols, 1), minor=True); ax.set_yticks(np.arange(-0.5, filas, 1), minor=True)
+        ax.grid(which="minor", color="white", lw=1.2); ax.tick_params(which="both", length=0); ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"{texto}\nfalla en {f.sum()} de {len(f)}  ->  riesgo {f.mean():.1%}", fontsize=10.5)
+    fig.suptitle(titulo + " (verde = cumple, rojo = rompe alguna regla)", fontsize=12); fig.tight_layout(); plt.show()
+
+
+def malla_agua_riesgo(Z, R, FR, demanda=1200.0, niveles=(0.0, 0.05, 0.10, 0.20, 0.30), xmax=1000):
+    """Todas las decisiones de la malla como puntos (agua total contra riesgo), la escalera del frente exacto y cinco niveles de riesgo marcados.
+    Z: agua de cada decisión; R: su riesgo; FR: el frente (déficit, riesgo, índice) de frente_riesgo."""
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(9.5, 5.4))
+    ax.scatter(Z, 100 * R, s=2, color="#9AA5AD", alpha=0.25, lw=0, label=f"las {len(Z):,} decisiones de la malla".replace(",", " "))
+    agua = demanda - FR[:, 0]
+    ax.step(agua, 100 * FR[:, 1], where="post", color=_AZUL, lw=2.5, label="frente exacto: la que más agua da para cada riesgo")
+    for r in niveles:
+        a = demanda - FR[FR[:, 1] <= r + 1e-12][-1][0]
+        ax.plot(a, 100 * r, "o", ms=9, mfc=_ORO, mec="k", zorder=5)
+        ax.annotate(f"riesgo ≤ {r:.0%}: {a:.0f} m³/d", (a, 100 * r), xytext=(10, -4), textcoords="offset points", fontsize=9.5,
+                    color=_ORO, fontweight="bold", bbox=dict(fc="white", ec=_ORO, lw=0.8))
+    ax.set_xlim(0, xmax); ax.set_ylim(-3, 103)
+    ax.set_xlabel("bombeo total de la decisión [m³/d]"); ax.set_ylabel("riesgo: geologías en que rompe [%]")
+    ax.set_title("Cada punto es una decisión: más agua, más riesgo"); ax.legend(loc="lower right", fontsize=9, markerscale=4)
+    fig.tight_layout(); plt.show()
+
+
+def malla_bombeo(paso=10.0, maximo=400.0, n_pozos=3):
+    """Todas las decisiones de bombeo de una malla: cada pozo de 0 a `maximo` en pasos de `paso`. Con 0–400 cada 10 y tres pozos, 41³ = 68 921 filas (p1, p2, p3)."""
+    g = np.arange(0, maximo + paso / 2, paso)
+    return np.array(np.meshgrid(*([g] * n_pozos), indexing="ij")).reshape(n_pozos, -1).T
+
+
+def fallas_malla(M, A, H, s_max=3.0, s_hum=1.25, lim_pozo=None, lim_hum=None, perdidas=None):
+    """¿Rompe cada decisión de la malla M en cada geología? Tabla de True/False de (decisiones x geologías).
+    A, H: matrices de respuesta de las geologías. Opcionales (apéndice A.4): lim_pozo y lim_hum, un límite por geología; perdidas, un abatimiento extra C·p² por geología."""
+    n = len(A)
+    lim_pozo = np.full(n, s_max) if lim_pozo is None else lim_pozo
+    lim_hum = np.full(n, s_hum) if lim_hum is None else lim_hum
+    F = np.zeros((len(M), n), dtype=bool)
+    for k in range(n):
+        s = M @ A[k].T
+        if perdidas is not None:
+            s = s + perdidas[k] * M**2
+        F[:, k] = (s > lim_pozo[k] + 1e-9).any(axis=1) | ((M @ H[k]) > lim_hum[k] + 1e-9)
+    return F
+
+
+def frente_riesgo(Z, R, demanda=1200.0):
+    """El frente exacto agua contra riesgo: para cada nivel de riesgo que aparece en R, la decisión con más agua Z. Una fila por escalón:
+    (déficit = demanda − agua, riesgo, número de la decisión en la malla)."""
+    filas = []
+    for r in np.unique(R):
+        ok = R <= r + 1e-12
+        i = np.flatnonzero(ok)[np.argmax(Z[ok])]
+        if not filas or demanda - Z[i] < filas[-1][0] - 1e-9:
+            filas.append([demanda - Z[i], R[i], i])
+    return np.array(filas)
+
+
+def agua_con_riesgo(FR, r, demanda=1200.0):
+    """El agua máxima del frente FR con riesgo ≤ r [m³/d]."""
+    return demanda - FR[FR[:, 1] <= r + 1e-12][-1][0]
+
+
+def decision_con_riesgo(FR, r):
+    """El número (en la malla) de la decisión del frente FR con más agua y riesgo ≤ r."""
+    return int(FR[FR[:, 1] <= r + 1e-12][-1][2])
+
+
+def falta_contra_frente(F_omo, FR):
+    """Cuánta agua le falta al frente de OMOPSO frente al exacto, nivel por nivel de riesgo (m³/d; 0 = la misma agua). Columnas: (déficit, riesgo)."""
+    return np.array([F_omo[F_omo[:, 1] <= r + 1e-12, 0].min() - d for d, r, _ in FR if (F_omo[:, 1] <= r + 1e-12).any()])
 
 def riesgo_contra_N(filas):
     """El riesgo real (en geologías nuevas) contra el número de geologías con que se optimizó. filas: (N, riesgo pedido, agua, riesgo real)."""
